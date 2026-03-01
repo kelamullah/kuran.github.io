@@ -1,805 +1,874 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, Search, ChevronRight, ChevronLeft, 
-  List, AlertCircle, Loader2, Globe, FileText, 
-  Type, Layers, ArrowRight, Copy, Check, Hash, Info
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kur'ân-ı Kerîm</title>
 
-// ==========================================
-// AYARLAR VE API YAPILANDIRMASI
-// ==========================================
-const API_BASE_URL = 'https://api.acikkuran.com';
-const DEFAULT_AUTHOR_ID = 105; 
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-const ALLOWED_TR = ['diyanet', 'elmalılı', 'elmalili', 'ibni kesir', 'ibn kesir', 'ibn-i kesir', 'hasan basri'];
-const ALLOWED_EN = ['khattab', 'haleem', 'usmani', 'bewley', 'pickthall', 'yusuf ali', 'maududi'];
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-// ==========================================
-// API SERVİS SINIFI
-// ==========================================
-class ApiService {
-  async fetch(endpoint) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
-      if (!response.ok) throw new Error(`HTTP hatası! Durum: ${response.status}`);
-      const json = await response.json();
-      if (json.meta || json.links) return json;
-      return json.data !== undefined ? json.data : json;
-    } catch (error) {
-      console.error('API Fetch Hatası:', error);
-      throw error;
-    }
-  }
+    <!-- Babel (Tarayıcıda JSX dönüştürmek için) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  getAuthors() { return this.fetch('/authors'); }
-  getSurahs() { return this.fetch('/surahs'); }
-  getSurah(surahId, authorId) { return this.fetch(`/surah/${surahId}?author=${authorId}`); }
-  getVerse(surahId, verseNum, authorId) { return this.fetch(`/surah/${surahId}/verse/${verseNum}?author=${authorId}`); }
-  getVerseTranslations(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/translations`); }
-  getVerseWords(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/words`); }
-  getVerseParts(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/verseparts`); }
-  getRootchars() { return this.fetch('/rootchars'); }
-  getRootsByChar(charId) { return this.fetch(`/rootchar/${charId}`); }
-  getRootByLatin(latinChars) { return this.fetch(`/root/latin/${latinChars}`); }
-  getRootVerseParts(latinChars, page, authorId) { return this.fetch(`/root/latin/${latinChars}/verseparts?page=${page}&author=${authorId}`); }
-  getPage(pageNum, authorId) { return this.fetch(`/page/${pageNum}?author_id=${authorId}`); }
-  search(query, authorId) { return this.fetch(`/search?q=${encodeURIComponent(query)}&author=${authorId}`); }
-}
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-const api = new ApiService();
-
-// ==========================================
-// YARDIMCI BİLEŞENLER
-// ==========================================
-const VerseCard = React.memo(({ verse, onDetailClick, hideActions = false }) => {
-  const [copied, setCopied] = useState(false);
-
-  const copyToClipboard = (text) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Kopyalanamadı', err);
-    }
-    document.body.removeChild(textArea);
-  };
-
-  const translationText = verse.translation?.text || (typeof verse.translation === 'string' ? verse.translation : 'Çeviri yüklenemedi.');
-  // HTML parse edileceği için className yerine standart HTML class attribute'u kullanılmalı
-  const formattedTranslation = translationText.replace(/<mark>/g, '<mark class="bg-emerald-200 text-emerald-900 px-1 rounded">');
-
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:border-emerald-200 transition-all mb-6 group">
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex flex-col items-center space-y-2">
-          {verse.surah && (
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-md mb-1 text-center">
-               {verse.surah.name}<br/>{verse.verse_number}
-            </span>
-          )}
-          {!verse.surah && (
-             <span className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-100 shrink-0">
-               {verse.verse_number}
-             </span>
-          )}
-          
-          <button 
-            onClick={() => copyToClipboard(verse.verse)}
-            className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
-            title="Arapça Metni Kopyala"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
-        <div className="flex-1 text-right ml-4 overflow-hidden">
-          <p className="text-3xl font-arabic leading-loose text-gray-900" dir="rtl">
-            {verse.verse}
-          </p>
-        </div>
-      </div>
-      <div className="border-t border-gray-100 pt-4">
-        <p className="text-gray-700 leading-relaxed text-lg" dangerouslySetInnerHTML={{ __html: formattedTranslation }} />
-        
-        {verse.translation?.footnotes?.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-dashed border-gray-100 text-sm text-gray-500 space-y-2">
-            {verse.translation.footnotes.map((fn, idx) => (
-              <p key={fn.id || idx}><strong className="text-emerald-700">[{fn.number}]</strong> {fn.text}</p>
-            ))}
-          </div>
-        )}
-      </div>
-      
-      {!hideActions && (
-        <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-end">
-          <button 
-            onClick={onDetailClick}
-            className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Analiz & Diğer Çeviriler</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-});
-
-// ==========================================
-// ALT GÖRÜNÜM BİLEŞENLERİ (VIEW COMPONENTS)
-// ==========================================
-
-const LoadingView = () => (
-  <div className="flex flex-col items-center justify-center h-full space-y-4 py-20">
-    <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
-    <p className="text-gray-500 font-medium">İçerik Yükleniyor...</p>
-  </div>
-);
-
-const ErrorView = ({ msg, onReturnHome }) => (
-  <div className="bg-red-50 text-red-700 p-6 rounded-2xl flex items-start space-x-3 m-8 border border-red-100 max-w-2xl mx-auto">
-    <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
-    <div>
-      <h3 className="font-bold mb-1">Bir Hata Oluştu</h3>
-      <p>{msg}</p>
-      <button onClick={onReturnHome} className="mt-4 text-sm font-bold underline bg-red-100 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">Ana Sayfaya Dön</button>
-    </div>
-  </div>
-);
-
-const HomeView = ({ navigateTo, onOpenDictionary }) => (
-  <div className="p-8 max-w-4xl mx-auto text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
-    <div className="bg-white p-12 rounded-[32px] border border-emerald-100 shadow-xl shadow-emerald-900/5 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-      <div className="bg-emerald-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8">
-         <BookOpen className="w-12 h-12 text-emerald-600 relative z-10" />
-      </div>
-      <h2 className="text-4xl font-bold text-gray-900 mb-4 relative z-10">Kur’ân-ı Kerîm Keşif Portalı</h2>
-      <p className="text-gray-600 text-lg max-w-lg mx-auto leading-relaxed relative z-10">
-        Kelime analizleri, kök sözlüğü ve farklı çevirilerle Kur’ân-ı Kerîm'i daha derinlemesine inceleyin.
-      </p>
-      <div className="mt-10 flex flex-wrap justify-center gap-4 relative z-10">
-         <button onClick={() => navigateTo({ type: 'surah', surahId: 1 })} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200">Fatiha ile Başla</button>
-         <button onClick={onOpenDictionary} className="px-8 py-3 bg-white text-emerald-700 border border-emerald-200 rounded-2xl font-bold hover:bg-emerald-50 transition-all">Kök Sözlüğü</button>
-      </div>
-    </div>
-  </div>
-);
-
-const ReadingView = ({ viewData, navigateTo }) => {
-  if (!viewData) return null;
-  return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center mb-10 bg-white p-10 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
-        <h2 className="text-6xl font-arabic font-bold text-emerald-950 mb-6 relative z-10">{viewData.name_original}</h2>
-        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-gray-400 uppercase tracking-widest font-bold mb-8 relative z-10">
-          <span className="text-emerald-600">{viewData.name} Suresi</span>
-          <span className="text-gray-200">|</span>
-          <span>{viewData.verse_count} Ayet</span>
-          <span className="text-gray-200">|</span>
-          <span>Sayfa {viewData.page_number}</span>
-        </div>
-        
-        {viewData.audio && (
-          <div className="bg-gray-50 p-4 rounded-2xl flex flex-col items-center justify-center space-y-3 border border-gray-100 max-w-sm mx-auto shadow-inner relative z-10">
-            {/* key özelliği audio elementinin source değiştiğinde yeniden yüklenmesini sağlar */}
-            <audio key={viewData.audio.mp3} controls className="w-full h-10 outline-none rounded-lg">
-              <source src={viewData.audio.mp3} type="audio/mpeg" />
-            </audio>
-          </div>
-        )}
-      </div>
-
-      {viewData.zero && (
-        <div className="text-center mb-16 py-8 border-y border-emerald-50">
-          <p className="text-4xl font-arabic text-gray-800 leading-loose mb-4" dir="rtl">{viewData.zero.verse}</p>
-          <p className="text-gray-500 italic text-lg">{viewData.zero.translation?.text}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {viewData.verses?.map(verse => (
-          <VerseCard 
-            key={verse.id} 
-            verse={verse} 
-            onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })} 
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const PageReadingView = ({ viewData, viewState, navigateTo }) => {
-  if (!viewData || viewData.length === 0) return <ErrorView msg="Bu sayfa için veri bulunamadı." onReturnHome={() => navigateTo({type: 'home'})} />;
-  let currentSurahTracker = null;
-
-  return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200 bg-white/50 backdrop-blur sticky top-0 z-10 py-4 px-2 rounded-xl">
-        <h2 className="text-2xl font-extrabold flex items-center text-gray-800">
-          <Hash className="w-7 h-7 mr-2 text-emerald-600"/> 
-          Sayfa {viewState.pageNum}
-        </h2>
-        <div className="flex items-center space-x-2">
-           <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum - 1 })} disabled={viewState.pageNum <= 1} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-emerald-50 disabled:opacity-30"><ChevronLeft className="w-5 h-5"/></button>
-           <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum + 1 })} disabled={viewState.pageNum >= 604} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-emerald-50 disabled:opacity-30"><ChevronRight className="w-5 h-5"/></button>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {viewData.map(verse => {
-          const isNewSurah = currentSurahTracker !== verse.surah.id;
-          currentSurahTracker = verse.surah.id;
-
-          return (
-            <React.Fragment key={verse.id}>
-              {isNewSurah && (
-                <div className="text-center my-12 p-8 bg-emerald-50/40 rounded-[24px] border border-emerald-100 shadow-sm animate-in zoom-in-95 cursor-pointer hover:bg-emerald-100/50 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: verse.surah.id })}>
-                  <h2 className="text-5xl font-arabic font-bold text-emerald-950 mb-3">{verse.surah.name_original}</h2>
-                  <p className="text-emerald-700 font-bold uppercase tracking-[0.2em] text-sm">{verse.surah.name} Suresi</p>
-                </div>
-              )}
-              {verse.zero && verse.verse_number === 1 && (
-                <div className="text-center mb-10 pb-6 border-b border-emerald-50">
-                  <p className="text-3xl font-arabic text-gray-700 leading-loose" dir="rtl">{verse.zero.verse}</p>
-                </div>
-              )}
-              <VerseCard 
-                verse={verse} 
-                onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah.id, verseNum: verse.verse_number })} 
-              />
-            </React.Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const VerseDetailView = ({ viewData, viewState, navigateTo }) => {
-  const [activeTab, setActiveTab] = useState('translations');
-  if (!viewData) return null;
-
-  return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-right-4 duration-400">
-      <button onClick={() => navigateTo({ type: 'surah', surahId: viewState.surahId })} className="flex items-center space-x-2 text-emerald-700 hover:text-emerald-900 mb-8 font-bold transition-all bg-white px-5 py-2.5 rounded-xl border border-emerald-100 shadow-sm">
-        <ChevronLeft className="w-5 h-5" /> <span>Sureye Dön</span>
-      </button>
-
-      <div className="bg-white rounded-[32px] shadow-sm border border-emerald-50 p-10 mb-8 text-center relative">
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:bg-emerald-100" onClick={() => navigateTo({ type: 'surah', surahId: viewData.fullVerse.surah.id })}>
-          {viewData.fullVerse.surah.name} Suresi, {viewData.fullVerse.verse_number}. Ayet
-        </div>
-        <p className="text-4xl font-arabic leading-loose text-gray-900 mt-6" dir="rtl">{viewData.fullVerse.verse}</p>
-      </div>
-
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-2xl mb-8">
-        {[
-          { id: 'translations', label: 'Tüm Çeviriler', icon: <Globe className="w-4 h-4"/> },
-          { id: 'words', label: 'Kelime Kelime', icon: <Type className="w-4 h-4"/> },
-          { id: 'grammar', label: 'Gramer Tahlili', icon: <Layers className="w-4 h-4"/> }
-        ].map(tab => (
-          <button 
-            key={tab.id}
-            className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-xs font-bold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} 
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.icon}
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-6">
-        {activeTab === 'translations' && (
-          <div className="grid gap-4">
-            {viewData.translations.map((t, idx) => (
-              <div key={idx} className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-colors">
-                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-3">{t.author?.name || t.author}</h4>
-                <p className="text-gray-800 text-lg leading-relaxed">{t.text}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'words' && (
-          <div className="flex flex-wrap flex-row-reverse gap-4 justify-start">
-            {viewData.words?.map((w, idx) => (
-              <div key={idx} className="bg-white rounded-2xl p-5 text-center border border-gray-100 min-w-[140px] flex-1 sm:flex-none shadow-sm hover:shadow-md transition-all">
-                <span className="text-4xl font-arabic mb-4 block text-gray-900" dir="rtl">{w.arabic || w.word}</span>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg block truncate">{w.translation_tr || w.translation}</span>
-              </div>
-            )) || <div className="text-center w-full py-20 text-gray-400 font-medium">Bu veri henüz eklenmemiş.</div>}
-          </div>
-        )}
-
-        {activeTab === 'grammar' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <th className="p-5">Kelime</th>
-                  <th className="p-5">Meali</th>
-                  <th className="p-5">Gramer Analizi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {viewData.verseparts?.map((vp, idx) => (
-                  <tr key={idx} className="hover:bg-emerald-50/20 transition-colors">
-                    <td className="p-5 font-arabic text-3xl text-gray-900" dir="rtl">{vp.arabic}</td>
-                    <td className="p-5 text-sm font-bold text-emerald-700">{vp.translation_tr}</td>
-                    <td className="p-5">
-                      {vp.details?.map((group, gIdx) => (
-                        <div key={gIdx} className="flex flex-wrap gap-1.5 mb-1">
-                          {group.map((d, dIdx) => (
-                            <span key={dIdx} className="bg-gray-100 text-[10px] font-bold text-gray-600 px-2 py-1 rounded-md border border-gray-200">{d.tr}</span>
-                          ))}
-                        </div>
-                      ))}
-                    </td>
-                  </tr>
-                ))}
-                {(!viewData.verseparts || viewData.verseparts.length === 0) && (
-                   <tr><td colSpan="3" className="p-10 text-center text-gray-400 font-medium">Bu ayet için gramer verisi bulunmuyor.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const RootDetailView = ({ viewData, viewState, navigateTo }) => {
-  if (!viewData) return null;
-  return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-left-4">
-      <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white p-10 rounded-[40px] shadow-2xl mb-12 relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500 rounded-full blur-[100px] opacity-20"></div>
-        <div className="relative z-10">
-          <div className="flex justify-between items-end mb-8">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-300 block mb-2">Arapça Kök</span>
-              <h2 className="text-7xl font-arabic font-bold">{viewData.detail.arabic}</h2>
-            </div>
-            <div className="text-right">
-              <span className="text-5xl font-bold opacity-20">{viewData.detail.latin}</span>
-            </div>
-          </div>
-          <p className="text-emerald-50 text-xl leading-relaxed font-medium mb-10 border-l-4 border-emerald-500/50 pl-6">{viewData.detail.mean}</p>
-          
-          <div className="flex flex-wrap gap-3">
-            {viewData.detail.diffs?.map(diff => (
-              <div key={diff.id} className="px-5 py-3 bg-white/10 backdrop-blur-md rounded-[18px] flex items-center space-x-4 border border-white/10 hover:bg-white/20 transition-all">
-                <span className="font-arabic text-3xl" dir="rtl">{diff.diff}</span>
-                <div className="w-px h-6 bg-white/20"></div>
-                <span className="text-sm font-black text-emerald-300">{diff.count} Kez</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        <h3 className="font-black text-xl text-gray-800 flex items-center uppercase tracking-widest">
-          <Layers className="w-6 h-6 mr-3 text-emerald-600"/> 
-          Kur'an'daki Örnekler
-        </h3>
-        
-        <div className="grid gap-6">
-          {viewData.verses?.map(item => (
-            <div key={item.id} className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden group hover:border-emerald-200 transition-all">
-              <div className="flex justify-between items-start mb-6">
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: item.surah.id })}>
-                  {item.surah.name} : {item.verse.verse_number}
-                </div>
-                <button onClick={() => navigateTo({ type: 'verse_detail', surahId: item.surah.id, verseNum: item.verse.verse_number })} className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 -translate-x-4 bg-emerald-50 p-2 rounded-full">
-                  <ArrowRight className="w-5 h-5"/>
-                </button>
-              </div>
-              
-              <p className="font-arabic text-3xl text-right mb-6 leading-loose text-gray-900" dir="rtl">{item.verse.verse}</p>
-              <p className="text-gray-600 text-lg mb-8 leading-relaxed">{item.verse.translation?.text || 'Çeviri bulunamadı.'}</p>
-              
-              <div className="p-6 bg-emerald-50/50 rounded-2xl flex items-center justify-between border border-emerald-100">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Eşleşen Meali</span>
-                  <span className="text-lg font-bold text-gray-800">{item.turkish || item.translation_tr}</span>
-                </div>
-                <span className="font-arabic text-4xl text-emerald-900" dir="rtl">{item.arabic}</span>
-              </div>
-            </div>
-          ))}
-          {(!viewData.verses || viewData.verses.length === 0) && (
-             <div className="text-center p-10 bg-white rounded-2xl border border-gray-100 text-gray-500">Bu kök için örnek ayet bulunamadı.</div>
-          )}
-        </div>
-
-        {viewData.meta && viewData.meta.last_page > 1 && (
-           <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-gray-100 shadow-sm mt-10">
-             <button 
-               disabled={viewData.meta.current_page === 1}
-               onClick={() => navigateTo({ type: 'root_detail', latin: viewState.latin, page: viewData.meta.current_page - 1 })}
-               className="px-6 py-2.5 bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-emerald-50 hover:border-emerald-200 transition-all font-bold text-xs"
-             >
-               ÖNCEKİ
-             </button>
-             <span className="text-xs font-black text-gray-400 bg-gray-100 px-5 py-2.5 rounded-xl uppercase tracking-widest">
-               Sayfa {viewData.meta.current_page} / {viewData.meta.last_page}
-             </span>
-             <button 
-               disabled={viewData.meta.current_page === viewData.meta.last_page}
-               onClick={() => navigateTo({ type: 'root_detail', latin: viewState.latin, page: viewData.meta.current_page + 1 })}
-               className="px-6 py-2.5 bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-emerald-50 hover:border-emerald-200 transition-all font-bold text-xs"
-             >
-               SONRAKİ
-             </button>
-           </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const SearchView = ({ viewData, viewState, navigateTo }) => {
-  if (!viewData) return null;
-  return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 animate-in fade-in">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold text-gray-800">Arama Sonuçları</h2>
-          <p className="text-gray-500 text-sm mt-1">"{viewState.query}" için {viewData.length || 0} sonuç bulundu.</p>
-        </div>
-      </div>
-
-      {viewData.length === 0 ? (
-        <div className="text-center bg-white p-10 rounded-2xl border border-gray-100">
-          <Info className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 font-medium">Aradığınız kelimeye uygun bir sonuç bulunamadı.</p>
-          <p className="text-sm text-gray-400 mt-2">Farklı bir kelime veya çevirmen seçerek tekrar deneyebilirsiniz.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {viewData.map(verse => (
-            <VerseCard 
-              key={verse.id} 
-              verse={verse} 
-              onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah.id, verseNum: verse.verse_number })} 
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Sidebar = ({ sidebarOpen, setSidebarOpen, navTab, setNavTab, surahs, viewState, navigateTo, rootChars, charRoots, setCharRoots, loadRootsForChar }) => (
-  <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-80 bg-gray-50 border-r border-gray-200 transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-    <div className="flex border-b border-gray-200 bg-white mt-16 lg:mt-0">
-      {['surahs', 'pages', 'dictionary'].map(tab => (
-        <button 
-          key={tab}
-          className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider transition-all ${navTab === tab ? 'text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50' : 'text-gray-400 hover:bg-gray-50'}`} 
-          onClick={() => setNavTab(tab)}
-        >
-          {tab === 'surahs' ? 'Sure' : tab === 'pages' ? 'Sayfa' : 'Sözlük'}
-        </button>
-      ))}
-    </div>
-
-    <div className="flex-1 overflow-y-auto custom-scrollbar">
-      {navTab === 'surahs' && (
-        <div className="p-2 space-y-1">
-          {surahs.map((surah) => {
-            const isActive = viewState.type === 'surah' && viewState.surahId === surah.id;
-            return (
-              <button key={surah.id} onClick={() => navigateTo({ type: 'surah', surahId: surah.id })} className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all ${isActive ? 'bg-emerald-100 text-emerald-900 font-medium shadow-inner' : 'hover:bg-white text-gray-700 hover:shadow-sm'}`}>
-                <div className="flex items-center space-x-3">
-                  <span className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${isActive ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{surah.id}</span>
-                  <div>
-                    <div className="text-sm font-semibold">{surah.name}</div>
-                    <div className="text-xs text-gray-500 opacity-80">{surah.verse_count} Ayet</div>
-                  </div>
-                </div>
-                <div className={`text-xl font-arabic ${isActive ? 'text-emerald-800' : 'text-gray-400'}`}>{surah.name_original}</div>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {navTab === 'pages' && (
-        <div className="p-4">
-          <div className="mb-4 flex space-x-2">
-            <input type="number" id="pageJump" min="1" max="604" placeholder="Sayfa (1-604)" className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500" onKeyDown={(e) => { if(e.key === 'Enter' && e.target.value) navigateTo({ type: 'page', pageNum: parseInt(e.target.value) }) }} />
-            <button onClick={() => { const val = document.getElementById('pageJump').value; if(val) navigateTo({ type: 'page', pageNum: parseInt(val) }); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">Git</button>
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({length: 604}, (_, i) => i + 1).map(p => {
-              const isActive = viewState.type === 'page' && viewState.pageNum === p;
-              return (
-                <button key={p} onClick={()=>navigateTo({ type: 'page', pageNum: p })} className={`p-2 text-xs border rounded-lg transition-all ${isActive ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:bg-emerald-50 hover:border-emerald-200'}`}>
-                  {p}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {navTab === 'dictionary' && (
-        <div className="p-4">
-          {charRoots ? (
-            <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-              <button onClick={() => setCharRoots(null)} className="mb-4 text-sm font-medium text-emerald-600 hover:text-emerald-800 flex items-center bg-emerald-50 px-3 py-1.5 rounded-lg w-fit transition-colors">
-                <ChevronLeft className="w-4 h-4 mr-1"/> Harflere Dön
-              </button>
-              <div className="space-y-2">
-                {charRoots.roots.map(root => (
-                  <button key={root.id} onClick={()=>navigateTo({ type: 'root_detail', latin: root.latin, page: 1 })} className="w-full text-left px-4 py-3 bg-white rounded-xl shadow-sm border border-transparent hover:border-emerald-200 flex justify-between items-center transition-all group">
-                    <span className="font-bold text-gray-700 text-lg group-hover:text-emerald-700">{root.latin}</span>
-                    <span className="font-arabic text-2xl text-emerald-800">{root.arabic}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-3" dir="rtl">
-              {rootChars.map(char => (
-                <button key={char.id} onClick={()=>loadRootsForChar(char.id)} className="p-3 bg-white border border-gray-200 rounded-xl hover:border-emerald-400 hover:text-emerald-700 hover:shadow-md font-arabic text-3xl text-gray-800 transition-all flex items-center justify-center h-14">
-                  {char.arabic}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  </aside>
-);
-
-// ==========================================
-// ANA UYGULAMA BİLEŞENİ
-// ==========================================
-export default function App() {
-  // Global Data States
-  const [authors, setAuthors] = useState([]);
-  const [surahs, setSurahs] = useState([]);
-  const [rootChars, setRootChars] = useState([]);
-  const [selectedAuthor, setSelectedAuthor] = useState(DEFAULT_AUTHOR_ID);
-  
-  // UI States
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [navTab, setNavTab] = useState('surahs'); 
-  const [charRoots, setCharRoots] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Merkezi State Yönetimi
-  const [viewState, setViewState] = useState({ type: 'home' });
-  const [viewData, setViewData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Uygulama İlk Yükleme
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        const [rawAuthorsData, surahsData, rootCharsData] = await Promise.all([
-          api.getAuthors(),
-          api.getSurahs(),
-          api.getRootchars()
-        ]);
-        
-        const filteredAuthors = (rawAuthorsData || []).filter(author => {
-          const name = author.name.toLocaleLowerCase('tr-TR');
-          const lang = author.language?.toLowerCase() || 'tr';
-          return lang === 'tr' ? ALLOWED_TR.some(k => name.includes(k)) : ALLOWED_EN.some(k => name.includes(k));
-        });
-        
-        setAuthors(filteredAuthors);
-        setSurahs(surahsData || []);
-        setRootChars(rootCharsData || []);
-
-        const hasanBasri = filteredAuthors.find(a => a.name.toLowerCase().includes('hasan basri'));
-        if (hasanBasri) setSelectedAuthor(parseInt(hasanBasri.id));
-        else if (filteredAuthors.length > 0) setSelectedAuthor(parseInt(filteredAuthors[0].id));
-
-      } catch (err) {
-        console.error("İlk yükleme hatası:", err);
-      }
-    };
-    loadInitialData();
-  }, []);
-
-  // ViewState veya Yazar değiştiğinde ana veriyi çek
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchViewData = async () => {
-      if (viewState.type === 'home') return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        let data = null;
-        switch (viewState.type) {
-          case 'surah':
-            data = await api.getSurah(viewState.surahId, selectedAuthor);
-            break;
-          case 'page':
-            const pageResp = await api.getPage(viewState.pageNum, selectedAuthor);
-            data = Array.isArray(pageResp) ? pageResp : Object.values(pageResp);
-            data.sort((a,b) => a.id - b.id);
-            break;
-          case 'verse_detail':
-            const [fullVerse, words, translationsData, verseparts] = await Promise.all([
-              api.getVerse(viewState.surahId, viewState.verseNum, selectedAuthor),
-              api.getVerseWords(viewState.surahId, viewState.verseNum),
-              api.getVerseTranslations(viewState.surahId, viewState.verseNum),
-              api.getVerseParts(viewState.surahId, viewState.verseNum)
-            ]);
-            const filteredTranslations = (translationsData || []).filter(t => {
-              const name = (t.author?.name || t.author || '').toLocaleLowerCase('tr-TR');
-              return ALLOWED_TR.some(k => name.includes(k)) || ALLOWED_EN.some(k => name.includes(k));
-            });
-            data = { fullVerse, words, translations: filteredTranslations, verseparts };
-            break;
-          case 'root_detail':
-            const detail = await api.getRootByLatin(viewState.latin);
-            const versesResp = await api.getRootVerseParts(viewState.latin, viewState.page || 1, selectedAuthor);
-            data = { detail, verses: versesResp.data, meta: versesResp.meta };
-            break;
-          case 'search':
-            const searchResp = await api.search(viewState.query, selectedAuthor);
-            data = searchResp;
-            break;
-          default:
-            break;
-        }
-        if (isMounted) setViewData(data);
-      } catch (err) {
-        if (isMounted) setError('Veri yüklenirken bir hata oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.');
-        console.error(err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchViewData();
-    return () => { isMounted = false; };
-  }, [viewState, selectedAuthor]);
-
-  // Eylemler (Actions)
-  const navigateTo = (newState) => {
-    setSidebarOpen(false); // Navigasyon anında mobil menüyü kapa
-    setViewState(newState);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim().length > 2) {
-      document.activeElement.blur(); // Mobilde klavyeyi kapatır
-      navigateTo({ type: 'search', query: searchQuery.trim() });
-    }
-  };
-
-  const loadRootsForChar = async (charId) => {
-    try {
-      const roots = await api.getRootsByChar(charId);
-      setCharRoots({ charId, roots });
-    } catch(err) { console.error(err); }
-  };
-
-  return (
-    <div className="flex h-screen bg-[#FDFDFD] font-sans text-gray-900 overflow-hidden selection:bg-emerald-100 selection:text-emerald-900">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    <!-- Özel Stiller -->
+    <style>
         .font-arabic { font-family: 'Amiri', serif; }
         .font-sans { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
-      `}</style>
 
-      {/* Mobil Sidebar Overlay */}
-      {sidebarOpen && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-
-      <Sidebar 
-        sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
-        navTab={navTab} setNavTab={setNavTab}
-        surahs={surahs} viewState={viewState}
-        navigateTo={navigateTo} rootChars={rootChars}
-        charRoots={charRoots} setCharRoots={setCharRoots}
-        loadRootsForChar={loadRootsForChar}
-      />
-
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        /* Tailwind animate eklentisi varsayılan olarak CDN'de gelmediği için basit fallback animasyonları */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInBottom { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(1rem); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInLeft { from { transform: translateX(-1rem); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
-        {/* HEADER */}
-        <header className="bg-white/90 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-20 px-4 py-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 bg-gray-50 hover:bg-emerald-50 rounded-xl text-emerald-700 transition-all">
-              <List className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-2 text-emerald-950 cursor-pointer group" onClick={() => navigateTo({ type: 'home' })}>
-              <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center shadow-md shadow-emerald-200 group-hover:bg-emerald-700 transition-colors">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="font-extrabold text-lg hidden sm:block tracking-tight uppercase">Kur’ân-ı<span className="text-emerald-600">Kerîm</span></h1>
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .slide-in-from-bottom-4 { animation: slideInBottom 0.4s ease-out forwards; }
+        .slide-in-from-right-4 { animation: slideInRight 0.4s ease-out forwards; }
+        .slide-in-from-left-4 { animation: slideInLeft 0.4s ease-out forwards; }
+        .zoom-in-95 { animation: zoomIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-[#FDFDFD] font-sans text-gray-900 overflow-hidden selection:bg-emerald-100 selection:text-emerald-900">
+    <!-- React uygulamasının bağlanacağı ana div -->
+    <div id="root" class="h-screen w-full"></div>
+
+    <!-- Uygulama Kodları (Babel ile derlenecek) -->
+    <script type="text/babel">
+        const { useState, useEffect, memo, Fragment } = React;
+
+        // ==========================================
+        // İKONLAR (lucide-react muadili saf SVG'ler)
+        // ==========================================
+        const createIcon = (paths) => ({ className, title }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{ __html: (title ? `<title>${title}</title>` : '') + paths }} />
+        );
+
+        const BookOpen = createIcon('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>');
+        const Search = createIcon('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>');
+        const ChevronRight = createIcon('<path d="m9 18 6-6-6-6"/>');
+        const ChevronLeft = createIcon('<path d="m15 18-6-6 6-6"/>');
+        const List = createIcon('<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>');
+        const AlertCircle = createIcon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>');
+        const Loader2 = createIcon('<path d="M21 12a9 9 0 1 1-6.219-8.56"/>');
+        const Globe = createIcon('<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>');
+        const FileText = createIcon('<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>');
+        const Type = createIcon('<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>');
+        const Layers = createIcon('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>');
+        const ArrowRight = createIcon('<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>');
+        const Copy = createIcon('<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>');
+        const Check = createIcon('<polyline points="20 6 9 17 4 12"/>');
+        const Hash = createIcon('<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>');
+        const Info = createIcon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>');
+
+        // ==========================================
+        // AYARLAR VE API YAPILANDIRMASI
+        // ==========================================
+        const API_BASE_URL = 'https://api.acikkuran.com';
+        const DEFAULT_AUTHOR_ID = 105; 
+
+        const ALLOWED_TR = ['diyanet', 'elmalılı', 'elmalili', 'ibni kesir', 'ibn kesir', 'ibn-i kesir', 'hasan basri'];
+        const ALLOWED_EN = ['khattab', 'haleem', 'usmani', 'bewley', 'pickthall', 'yusuf ali', 'maududi'];
+
+        // ==========================================
+        // API SERVİS SINIFI
+        // ==========================================
+        class ApiService {
+            async fetch(endpoint) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+                    if (!response.ok) throw new Error(`HTTP hatası! Durum: ${response.status}`);
+                    const json = await response.json();
+                    if (json.meta || json.links) return json;
+                    return json.data !== undefined ? json.data : json;
+                } catch (error) {
+                    console.error('API Fetch Hatası:', error);
+                    throw error;
+                }
+            }
+
+            getAuthors() { return this.fetch('/authors'); }
+            getSurahs() { return this.fetch('/surahs'); }
+            getSurah(surahId, authorId) { return this.fetch(`/surah/${surahId}?author=${authorId}`); }
+            getVerse(surahId, verseNum, authorId) { return this.fetch(`/surah/${surahId}/verse/${verseNum}?author=${authorId}`); }
+            getVerseTranslations(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/translations`); }
+            getVerseWords(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/words`); }
+            getVerseParts(surahId, verseNum) { return this.fetch(`/surah/${surahId}/verse/${verseNum}/verseparts`); }
+            getRootchars() { return this.fetch('/rootchars'); }
+            getRootsByChar(charId) { return this.fetch(`/rootchar/${charId}`); }
+            getRootByLatin(latinChars) { return this.fetch(`/root/latin/${latinChars}`); }
+            getRootVerseParts(latinChars, page, authorId) { return this.fetch(`/root/latin/${latinChars}/verseparts?page=${page}&author=${authorId}`); }
+            getPage(pageNum, authorId) { return this.fetch(`/page/${pageNum}?author_id=${authorId}`); }
+            search(query, authorId) { return this.fetch(`/search?q=${encodeURIComponent(query)}&author=${authorId}`); }
+        }
+
+        const api = new ApiService();
+
+        // ==========================================
+        // YARDIMCI BİLEŞENLER
+        // ==========================================
+        const VerseCard = memo(({ verse, onDetailClick, hideActions = false }) => {
+            const [copied, setCopied] = useState(false);
+
+            const copyToClipboard = (text) => {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                } catch (err) {
+                    console.error('Kopyalanamadı', err);
+                }
+                document.body.removeChild(textArea);
+            };
+
+            const translationText = verse.translation?.text || (typeof verse.translation === 'string' ? verse.translation : 'Çeviri yüklenemedi.');
+            const formattedTranslation = translationText.replace(/<mark>/g, '<mark class="bg-emerald-200 text-emerald-900 px-1 rounded">');
+
+            return (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:border-emerald-200 transition-all mb-6 group">
+                <div className="flex justify-between items-start mb-6">
+                    <div className="flex flex-col items-center space-y-2">
+                    {verse.surah && (
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-md mb-1 text-center">
+                        {verse.surah.name}<br/>{verse.verse_number}
+                        </span>
+                    )}
+                    {!verse.surah && (
+                        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-100 shrink-0">
+                        {verse.verse_number}
+                        </span>
+                    )}
+                    
+                    <button 
+                        onClick={() => copyToClipboard(verse.verse)}
+                        className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
+                        title="Arapça Metni Kopyala"
+                    >
+                        {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                    </div>
+                    <div className="flex-1 text-right ml-4 overflow-hidden">
+                    <p className="text-3xl font-arabic leading-loose text-gray-900" dir="rtl">
+                        {verse.verse}
+                    </p>
+                    </div>
+                </div>
+                <div className="border-t border-gray-100 pt-4">
+                    <p className="text-gray-700 leading-relaxed text-lg" dangerouslySetInnerHTML={{ __html: formattedTranslation }} />
+                    
+                    {verse.translation?.footnotes?.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-dashed border-gray-100 text-sm text-gray-500 space-y-2">
+                        {verse.translation.footnotes.map((fn, idx) => (
+                        <p key={fn.id || idx}><strong className="text-emerald-700">[{fn.number}]</strong> {fn.text}</p>
+                        ))}
+                    </div>
+                    )}
+                </div>
+                
+                {!hideActions && (
+                    <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-end">
+                    <button 
+                        onClick={onDetailClick}
+                        className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                        <FileText className="w-4 h-4" />
+                        <span>Analiz & Diğer Çeviriler</span>
+                    </button>
+                    </div>
+                )}
+                </div>
+            );
+        });
+
+        // ==========================================
+        // ALT GÖRÜNÜM BİLEŞENLERİ (VIEW COMPONENTS)
+        // ==========================================
+
+        const LoadingView = () => (
+            <div className="flex flex-col items-center justify-center h-full space-y-4 py-20">
+                <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+                <p className="text-gray-500 font-medium">İçerik Yükleniyor...</p>
             </div>
-          </div>
-          
-          <div className="flex items-center flex-1 max-w-md mx-4 hidden md:block">
-            <form onSubmit={handleSearchSubmit} className="relative w-full">
-               <input 
-                 type="text" 
-                 value={searchQuery}
-                 onChange={(e) => setSearchQuery(e.target.value)}
-                 placeholder="Kur'an'da kelime veya meal ara..." 
-                 className="w-full bg-gray-50 border border-gray-100 text-sm rounded-full pl-10 pr-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-               />
-               <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600">
-                 <Search className="w-4 h-4" />
-               </button>
-            </form>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <div className="relative group min-w-[140px]">
-               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 pointer-events-none" />
-               <select 
-                value={selectedAuthor} 
-                onChange={(e) => setSelectedAuthor(parseInt(e.target.value))}
-                className="w-full bg-emerald-50/50 border border-emerald-100 text-emerald-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all appearance-none cursor-pointer hover:bg-emerald-50"
-              >
-                {authors.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+        );
+
+        const ErrorView = ({ msg, onReturnHome }) => (
+            <div className="bg-red-50 text-red-700 p-6 rounded-2xl flex items-start space-x-3 m-8 border border-red-100 max-w-2xl mx-auto">
+                <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
+                <div>
+                <h3 className="font-bold mb-1">Bir Hata Oluştu</h3>
+                <p>{msg}</p>
+                <button onClick={onReturnHome} className="mt-4 text-sm font-bold underline bg-red-100 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">Ana Sayfaya Dön</button>
+                </div>
+            </div>
+        );
+
+        const HomeView = ({ navigateTo, onOpenDictionary }) => (
+            <div className="p-8 max-w-4xl mx-auto text-center space-y-8 fade-in zoom-in-95">
+                <div className="bg-white p-12 rounded-[32px] border border-emerald-100 shadow-xl shadow-emerald-900/5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+                <div className="bg-emerald-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8">
+                    <BookOpen className="w-12 h-12 text-emerald-600 relative z-10" />
+                </div>
+                <h2 className="text-4xl font-bold text-gray-900 mb-4 relative z-10">Kur’ân-ı Kerîm Keşif Portalı</h2>
+                <p className="text-gray-600 text-lg max-w-lg mx-auto leading-relaxed relative z-10">
+                    Kelime analizleri, kök sözlüğü ve farklı çevirilerle Kur’ân-ı Kerîm'i daha derinlemesine inceleyin.
+                </p>
+                <div className="mt-10 flex flex-wrap justify-center gap-4 relative z-10">
+                    <button onClick={() => navigateTo({ type: 'surah', surahId: 1 })} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200">Fatiha ile Başla</button>
+                    <button onClick={onOpenDictionary} className="px-8 py-3 bg-white text-emerald-700 border border-emerald-200 rounded-2xl font-bold hover:bg-emerald-50 transition-all">Kök Sözlüğü</button>
+                </div>
+                </div>
+            </div>
+        );
+
+        const ReadingView = ({ viewData, navigateTo }) => {
+            if (!viewData) return null;
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in slide-in-from-bottom-4">
+                <div className="text-center mb-10 bg-white p-10 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
+                    <h2 className="text-6xl font-arabic font-bold text-emerald-950 mb-6 relative z-10">{viewData.name_original}</h2>
+                    <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-gray-400 uppercase tracking-widest font-bold mb-8 relative z-10">
+                    <span className="text-emerald-600">{viewData.name} Suresi</span>
+                    <span className="text-gray-200">|</span>
+                    <span>{viewData.verse_count} Ayet</span>
+                    <span className="text-gray-200">|</span>
+                    <span>Sayfa {viewData.page_number}</span>
+                    </div>
+                    
+                    {viewData.audio && (
+                    <div className="bg-gray-50 p-4 rounded-2xl flex flex-col items-center justify-center space-y-3 border border-gray-100 max-w-sm mx-auto shadow-inner relative z-10">
+                        <audio key={viewData.audio.mp3} controls className="w-full h-10 outline-none rounded-lg">
+                        <source src={viewData.audio.mp3} type="audio/mpeg" />
+                        </audio>
+                    </div>
+                    )}
+                </div>
+
+                {viewData.zero && (
+                    <div className="text-center mb-16 py-8 border-y border-emerald-50">
+                    <p className="text-4xl font-arabic text-gray-800 leading-loose mb-4" dir="rtl">{viewData.zero.verse}</p>
+                    <p className="text-gray-500 italic text-lg">{viewData.zero.translation?.text}</p>
+                    </div>
+                )}
+
+                <div className="space-y-4">
+                    {viewData.verses?.map(verse => (
+                    <VerseCard 
+                        key={verse.id} 
+                        verse={verse} 
+                        onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })} 
+                    />
+                    ))}
+                </div>
+                </div>
+            );
+        };
+
+        const PageReadingView = ({ viewData, viewState, navigateTo }) => {
+            if (!viewData || viewData.length === 0) return <ErrorView msg="Bu sayfa için veri bulunamadı." onReturnHome={() => navigateTo({type: 'home'})} />;
+            let currentSurahTracker = null;
+
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in">
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200 bg-white/50 backdrop-blur sticky top-0 z-10 py-4 px-2 rounded-xl">
+                    <h2 className="text-2xl font-extrabold flex items-center text-gray-800">
+                    <Hash className="w-7 h-7 mr-2 text-emerald-600"/> 
+                    Sayfa {viewState.pageNum}
+                    </h2>
+                    <div className="flex items-center space-x-2">
+                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum - 1 })} disabled={viewState.pageNum <= 1} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-emerald-50 disabled:opacity-30"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum + 1 })} disabled={viewState.pageNum >= 604} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-emerald-50 disabled:opacity-30"><ChevronRight className="w-5 h-5"/></button>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {viewData.map(verse => {
+                    const isNewSurah = currentSurahTracker !== verse.surah.id;
+                    currentSurahTracker = verse.surah.id;
+
+                    return (
+                        <Fragment key={verse.id}>
+                        {isNewSurah && (
+                            <div className="text-center my-12 p-8 bg-emerald-50/40 rounded-[24px] border border-emerald-100 shadow-sm zoom-in-95 cursor-pointer hover:bg-emerald-100/50 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: verse.surah.id })}>
+                            <h2 className="text-5xl font-arabic font-bold text-emerald-950 mb-3">{verse.surah.name_original}</h2>
+                            <p className="text-emerald-700 font-bold uppercase tracking-[0.2em] text-sm">{verse.surah.name} Suresi</p>
+                            </div>
+                        )}
+                        {verse.zero && verse.verse_number === 1 && (
+                            <div className="text-center mb-10 pb-6 border-b border-emerald-50">
+                            <p className="text-3xl font-arabic text-gray-700 leading-loose" dir="rtl">{verse.zero.verse}</p>
+                            </div>
+                        )}
+                        <VerseCard 
+                            verse={verse} 
+                            onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah.id, verseNum: verse.verse_number })} 
+                        />
+                        </Fragment>
+                    );
+                    })}
+                </div>
+                </div>
+            );
+        };
+
+        const VerseDetailView = ({ viewData, viewState, navigateTo }) => {
+            const [activeTab, setActiveTab] = useState('translations');
+            if (!viewData) return null;
+
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in slide-in-from-right-4">
+                <button onClick={() => navigateTo({ type: 'surah', surahId: viewState.surahId })} className="flex items-center space-x-2 text-emerald-700 hover:text-emerald-900 mb-8 font-bold transition-all bg-white px-5 py-2.5 rounded-xl border border-emerald-100 shadow-sm">
+                    <ChevronLeft className="w-5 h-5" /> <span>Sureye Dön</span>
+                </button>
+
+                <div className="bg-white rounded-[32px] shadow-sm border border-emerald-50 p-10 mb-8 text-center relative">
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:bg-emerald-100" onClick={() => navigateTo({ type: 'surah', surahId: viewData.fullVerse.surah.id })}>
+                    {viewData.fullVerse.surah.name} Suresi, {viewData.fullVerse.verse_number}. Ayet
+                    </div>
+                    <p className="text-4xl font-arabic leading-loose text-gray-900 mt-6" dir="rtl">{viewData.fullVerse.verse}</p>
+                </div>
+
+                <div className="flex space-x-1 bg-gray-100 p-1 rounded-2xl mb-8">
+                    {[
+                    { id: 'translations', label: 'Tüm Çeviriler', icon: <Globe className="w-4 h-4"/> },
+                    { id: 'words', label: 'Kelime Kelime', icon: <Type className="w-4 h-4"/> },
+                    { id: 'grammar', label: 'Gramer Tahlili', icon: <Layers className="w-4 h-4"/> }
+                    ].map(tab => (
+                    <button 
+                        key={tab.id}
+                        className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-xs font-bold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} 
+                        onClick={() => setActiveTab(tab.id)}
+                    >
+                        {tab.icon}
+                        <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                    ))}
+                </div>
+
+                <div className="space-y-6">
+                    {activeTab === 'translations' && (
+                    <div className="grid gap-4">
+                        {viewData.translations.map((t, idx) => (
+                        <div key={idx} className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-colors">
+                            <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-3">{t.author?.name || t.author}</h4>
+                            <p className="text-gray-800 text-lg leading-relaxed">{t.text}</p>
+                        </div>
+                        ))}
+                    </div>
+                    )}
+
+                    {activeTab === 'words' && (
+                    <div className="flex flex-wrap flex-row-reverse gap-4 justify-start">
+                        {viewData.words?.map((w, idx) => (
+                        <div key={idx} className="bg-white rounded-2xl p-5 text-center border border-gray-100 min-w-[140px] flex-1 sm:flex-none shadow-sm hover:shadow-md transition-all">
+                            <span className="text-4xl font-arabic mb-4 block text-gray-900" dir="rtl">{w.arabic || w.word}</span>
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg block truncate">{w.translation_tr || w.translation}</span>
+                        </div>
+                        )) || <div className="text-center w-full py-20 text-gray-400 font-medium">Bu veri henüz eklenmemiş.</div>}
+                    </div>
+                    )}
+
+                    {activeTab === 'grammar' && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            <th className="p-5">Kelime</th>
+                            <th className="p-5">Meali</th>
+                            <th className="p-5">Gramer Analizi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {viewData.verseparts?.map((vp, idx) => (
+                            <tr key={idx} className="hover:bg-emerald-50/20 transition-colors">
+                                <td className="p-5 font-arabic text-3xl text-gray-900" dir="rtl">{vp.arabic}</td>
+                                <td className="p-5 text-sm font-bold text-emerald-700">{vp.translation_tr}</td>
+                                <td className="p-5">
+                                {vp.details?.map((group, gIdx) => (
+                                    <div key={gIdx} className="flex flex-wrap gap-1.5 mb-1">
+                                    {group.map((d, dIdx) => (
+                                        <span key={dIdx} className="bg-gray-100 text-[10px] font-bold text-gray-600 px-2 py-1 rounded-md border border-gray-200">{d.tr}</span>
+                                    ))}
+                                    </div>
+                                ))}
+                                </td>
+                            </tr>
+                            ))}
+                            {(!viewData.verseparts || viewData.verseparts.length === 0) && (
+                            <tr><td colSpan="3" className="p-10 text-center text-gray-400 font-medium">Bu ayet için gramer verisi bulunmuyor.</td></tr>
+                            )}
+                        </tbody>
+                        </table>
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        };
+
+        const RootDetailView = ({ viewData, viewState, navigateTo }) => {
+            if (!viewData) return null;
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in slide-in-from-left-4">
+                <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white p-10 rounded-[40px] shadow-2xl mb-12 relative overflow-hidden">
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500 rounded-full blur-[100px] opacity-20"></div>
+                    <div className="relative z-10">
+                    <div className="flex justify-between items-end mb-8">
+                        <div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-300 block mb-2">Arapça Kök</span>
+                        <h2 className="text-7xl font-arabic font-bold">{viewData.detail.arabic}</h2>
+                        </div>
+                        <div className="text-right">
+                        <span className="text-5xl font-bold opacity-20">{viewData.detail.latin}</span>
+                        </div>
+                    </div>
+                    <p className="text-emerald-50 text-xl leading-relaxed font-medium mb-10 border-l-4 border-emerald-500/50 pl-6">{viewData.detail.mean}</p>
+                    
+                    <div className="flex flex-wrap gap-3">
+                        {viewData.detail.diffs?.map(diff => (
+                        <div key={diff.id} className="px-5 py-3 bg-white/10 backdrop-blur-md rounded-[18px] flex items-center space-x-4 border border-white/10 hover:bg-white/20 transition-all">
+                            <span className="font-arabic text-3xl" dir="rtl">{diff.diff}</span>
+                            <div className="w-px h-6 bg-white/20"></div>
+                            <span className="text-sm font-black text-emerald-300">{diff.count} Kez</span>
+                        </div>
+                        ))}
+                    </div>
+                    </div>
+                </div>
+
+                <div className="space-y-8">
+                    <h3 className="font-black text-xl text-gray-800 flex items-center uppercase tracking-widest">
+                    <Layers className="w-6 h-6 mr-3 text-emerald-600"/> 
+                    Kur'an'daki Örnekler
+                    </h3>
+                    
+                    <div className="grid gap-6">
+                    {viewData.verses?.map(item => (
+                        <div key={item.id} className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden group hover:border-emerald-200 transition-all">
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: item.surah.id })}>
+                            {item.surah.name} : {item.verse.verse_number}
+                            </div>
+                            <button onClick={() => navigateTo({ type: 'verse_detail', surahId: item.surah.id, verseNum: item.verse.verse_number })} className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 -translate-x-4 bg-emerald-50 p-2 rounded-full">
+                            <ArrowRight className="w-5 h-5"/>
+                            </button>
+                        </div>
+                        
+                        <p className="font-arabic text-3xl text-right mb-6 leading-loose text-gray-900" dir="rtl">{item.verse.verse}</p>
+                        <p className="text-gray-600 text-lg mb-8 leading-relaxed">{item.verse.translation?.text || 'Çeviri bulunamadı.'}</p>
+                        
+                        <div className="p-6 bg-emerald-50/50 rounded-2xl flex items-center justify-between border border-emerald-100">
+                            <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Eşleşen Meali</span>
+                            <span className="text-lg font-bold text-gray-800">{item.turkish || item.translation_tr}</span>
+                            </div>
+                            <span className="font-arabic text-4xl text-emerald-900" dir="rtl">{item.arabic}</span>
+                        </div>
+                        </div>
+                    ))}
+                    {(!viewData.verses || viewData.verses.length === 0) && (
+                        <div className="text-center p-10 bg-white rounded-2xl border border-gray-100 text-gray-500">Bu kök için örnek ayet bulunamadı.</div>
+                    )}
+                    </div>
+
+                    {viewData.meta && viewData.meta.last_page > 1 && (
+                    <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-gray-100 shadow-sm mt-10">
+                        <button 
+                        disabled={viewData.meta.current_page === 1}
+                        onClick={() => navigateTo({ type: 'root_detail', latin: viewState.latin, page: viewData.meta.current_page - 1 })}
+                        className="px-6 py-2.5 bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-emerald-50 hover:border-emerald-200 transition-all font-bold text-xs"
+                        >
+                        ÖNCEKİ
+                        </button>
+                        <span className="text-xs font-black text-gray-400 bg-gray-100 px-5 py-2.5 rounded-xl uppercase tracking-widest">
+                        Sayfa {viewData.meta.current_page} / {viewData.meta.last_page}
+                        </span>
+                        <button 
+                        disabled={viewData.meta.current_page === viewData.meta.last_page}
+                        onClick={() => navigateTo({ type: 'root_detail', latin: viewState.latin, page: viewData.meta.current_page + 1 })}
+                        className="px-6 py-2.5 bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 hover:bg-emerald-50 hover:border-emerald-200 transition-all font-bold text-xs"
+                        >
+                        SONRAKİ
+                        </button>
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        };
+
+        const SearchView = ({ viewData, viewState, navigateTo }) => {
+            if (!viewData) return null;
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in">
+                <div className="mb-8 flex items-center justify-between">
+                    <div>
+                    <h2 className="text-2xl font-extrabold text-gray-800">Arama Sonuçları</h2>
+                    <p className="text-gray-500 text-sm mt-1">"{viewState.query}" için {viewData.length || 0} sonuç bulundu.</p>
+                    </div>
+                </div>
+
+                {viewData.length === 0 ? (
+                    <div className="text-center bg-white p-10 rounded-2xl border border-gray-100">
+                    <Info className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 font-medium">Aradığınız kelimeye uygun bir sonuç bulunamadı.</p>
+                    <p className="text-sm text-gray-400 mt-2">Farklı bir kelime veya çevirmen seçerek tekrar deneyebilirsiniz.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                    {viewData.map(verse => (
+                        <VerseCard 
+                        key={verse.id} 
+                        verse={verse} 
+                        onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah.id, verseNum: verse.verse_number })} 
+                        />
+                    ))}
+                    </div>
+                )}
+                </div>
+            );
+        };
+
+        const Sidebar = ({ sidebarOpen, setSidebarOpen, navTab, setNavTab, surahs, viewState, navigateTo, rootChars, charRoots, setCharRoots, loadRootsForChar }) => (
+            <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-80 bg-gray-50 border-r border-gray-200 transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+                <div className="flex border-b border-gray-200 bg-white mt-16 lg:mt-0">
+                {['surahs', 'pages', 'dictionary'].map(tab => (
+                    <button 
+                    key={tab}
+                    className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider transition-all ${navTab === tab ? 'text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50' : 'text-gray-400 hover:bg-gray-50'}`} 
+                    onClick={() => setNavTab(tab)}
+                    >
+                    {tab === 'surahs' ? 'Sure' : tab === 'pages' ? 'Sayfa' : 'Sözlük'}
+                    </button>
                 ))}
-              </select>
-            </div>
-          </div>
-        </header>
+                </div>
 
-        {/* MOBİL ARAMA (Yalnızca mobilde görünür) */}
-        <div className="md:hidden bg-white px-4 py-2 border-b border-gray-100">
-           <form onSubmit={handleSearchSubmit} className="relative w-full">
-             <input 
-               type="text" 
-               value={searchQuery}
-               onChange={(e) => setSearchQuery(e.target.value)}
-               placeholder="Kur'an'da ara..." 
-               className="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl pl-10 pr-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20"
-             />
-             <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-               <Search className="w-4 h-4" />
-             </button>
-          </form>
-        </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {navTab === 'surahs' && (
+                    <div className="p-2 space-y-1">
+                    {surahs.map((surah) => {
+                        const isActive = viewState.type === 'surah' && viewState.surahId === surah.id;
+                        return (
+                        <button key={surah.id} onClick={() => navigateTo({ type: 'surah', surahId: surah.id })} className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all ${isActive ? 'bg-emerald-100 text-emerald-900 font-medium shadow-inner' : 'hover:bg-white text-gray-700 hover:shadow-sm'}`}>
+                            <div className="flex items-center space-x-3">
+                            <span className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${isActive ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{surah.id}</span>
+                            <div>
+                                <div className="text-sm font-semibold">{surah.name}</div>
+                                <div className="text-xs text-gray-500 opacity-80">{surah.verse_count} Ayet</div>
+                            </div>
+                            </div>
+                            <div className={`text-xl font-arabic ${isActive ? 'text-emerald-800' : 'text-gray-400'}`}>{surah.name_original}</div>
+                        </button>
+                        )
+                    })}
+                    </div>
+                )}
 
-        {/* ANA İÇERİK (MAIN CONTENT) */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#fafafa]/50">
-          {loading ? <LoadingView /> : error ? <ErrorView msg={error} onReturnHome={() => navigateTo({type: 'home'})} /> : (
-            <div className="pb-20">
-              {viewState.type === 'home' && <HomeView navigateTo={navigateTo} onOpenDictionary={() => { setSidebarOpen(true); setNavTab('dictionary'); }} />}
-              {viewState.type === 'surah' && <ReadingView viewData={viewData} navigateTo={navigateTo} />}
-              {viewState.type === 'page' && <PageReadingView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
-              {viewState.type === 'verse_detail' && <VerseDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
-              {viewState.type === 'root_detail' && <RootDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
-              {viewState.type === 'search' && <SearchView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
-            </div>
-          )}
-        </main>
+                {navTab === 'pages' && (
+                    <div className="p-4">
+                    <div className="mb-4 flex space-x-2">
+                        <input type="number" id="pageJump" min="1" max="604" placeholder="Sayfa (1-604)" className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500" onKeyDown={(e) => { if(e.key === 'Enter' && e.target.value) navigateTo({ type: 'page', pageNum: parseInt(e.target.value) }) }} />
+                        <button onClick={() => { const val = document.getElementById('pageJump').value; if(val) navigateTo({ type: 'page', pageNum: parseInt(val) }); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">Git</button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        {Array.from({length: 604}, (_, i) => i + 1).map(p => {
+                        const isActive = viewState.type === 'page' && viewState.pageNum === p;
+                        return (
+                            <button key={p} onClick={()=>navigateTo({ type: 'page', pageNum: p })} className={`p-2 text-xs border rounded-lg transition-all ${isActive ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:bg-emerald-50 hover:border-emerald-200'}`}>
+                            {p}
+                            </button>
+                        )
+                        })}
+                    </div>
+                    </div>
+                )}
 
-      </div>
-    </div>
-  );
-}
+                {navTab === 'dictionary' && (
+                    <div className="p-4">
+                    {charRoots ? (
+                        <div className="fade-in slide-in-from-left-2 duration-300">
+                        <button onClick={() => setCharRoots(null)} className="mb-4 text-sm font-medium text-emerald-600 hover:text-emerald-800 flex items-center bg-emerald-50 px-3 py-1.5 rounded-lg w-fit transition-colors">
+                            <ChevronLeft className="w-4 h-4 mr-1"/> Harflere Dön
+                        </button>
+                        <div className="space-y-2">
+                            {charRoots.roots.map(root => (
+                            <button key={root.id} onClick={()=>navigateTo({ type: 'root_detail', latin: root.latin, page: 1 })} className="w-full text-left px-4 py-3 bg-white rounded-xl shadow-sm border border-transparent hover:border-emerald-200 flex justify-between items-center transition-all group">
+                                <span className="font-bold text-gray-700 text-lg group-hover:text-emerald-700">{root.latin}</span>
+                                <span className="font-arabic text-2xl text-emerald-800">{root.arabic}</span>
+                            </button>
+                            ))}
+                        </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-4 gap-3" dir="rtl">
+                        {rootChars.map(char => (
+                            <button key={char.id} onClick={()=>loadRootsForChar(char.id)} className="p-3 bg-white border border-gray-200 rounded-xl hover:border-emerald-400 hover:text-emerald-700 hover:shadow-md font-arabic text-3xl text-gray-800 transition-all flex items-center justify-center h-14">
+                            {char.arabic}
+                            </button>
+                        ))}
+                        </div>
+                    )}
+                    </div>
+                )}
+                </div>
+            </aside>
+        );
+
+        // ==========================================
+        // ANA UYGULAMA BİLEŞENİ
+        // ==========================================
+        function App() {
+            // Global Data States
+            const [authors, setAuthors] = useState([]);
+            const [surahs, setSurahs] = useState([]);
+            const [rootChars, setRootChars] = useState([]);
+            const [selectedAuthor, setSelectedAuthor] = useState(DEFAULT_AUTHOR_ID);
+            
+            // UI States
+            const [sidebarOpen, setSidebarOpen] = useState(false);
+            const [navTab, setNavTab] = useState('surahs'); 
+            const [charRoots, setCharRoots] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            
+            // Merkezi State Yönetimi
+            const [viewState, setViewState] = useState({ type: 'home' });
+            const [viewData, setViewData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+
+            // Uygulama İlk Yükleme
+            useEffect(() => {
+                const loadInitialData = async () => {
+                try {
+                    const [rawAuthorsData, surahsData, rootCharsData] = await Promise.all([
+                    api.getAuthors(),
+                    api.getSurahs(),
+                    api.getRootchars()
+                    ]);
+                    
+                    const filteredAuthors = (rawAuthorsData || []).filter(author => {
+                    const name = author.name.toLocaleLowerCase('tr-TR');
+                    const lang = author.language?.toLowerCase() || 'tr';
+                    return lang === 'tr' ? ALLOWED_TR.some(k => name.includes(k)) : ALLOWED_EN.some(k => name.includes(k));
+                    });
+                    
+                    setAuthors(filteredAuthors);
+                    setSurahs(surahsData || []);
+                    setRootChars(rootCharsData || []);
+
+                    const hasanBasri = filteredAuthors.find(a => a.name.toLowerCase().includes('hasan basri'));
+                    if (hasanBasri) setSelectedAuthor(parseInt(hasanBasri.id));
+                    else if (filteredAuthors.length > 0) setSelectedAuthor(parseInt(filteredAuthors[0].id));
+
+                } catch (err) {
+                    console.error("İlk yükleme hatası:", err);
+                }
+                };
+                loadInitialData();
+            }, []);
+
+            // ViewState veya Yazar değiştiğinde ana veriyi çek
+            useEffect(() => {
+                let isMounted = true;
+                
+                const fetchViewData = async () => {
+                if (viewState.type === 'home') return;
+                
+                setLoading(true);
+                setError(null);
+                
+                try {
+                    let data = null;
+                    switch (viewState.type) {
+                    case 'surah':
+                        data = await api.getSurah(viewState.surahId, selectedAuthor);
+                        break;
+                    case 'page':
+                        const pageResp = await api.getPage(viewState.pageNum, selectedAuthor);
+                        data = Array.isArray(pageResp) ? pageResp : Object.values(pageResp);
+                        data.sort((a,b) => a.id - b.id);
+                        break;
+                    case 'verse_detail':
+                        const [fullVerse, words, translationsData, verseparts] = await Promise.all([
+                        api.getVerse(viewState.surahId, viewState.verseNum, selectedAuthor),
+                        api.getVerseWords(viewState.surahId, viewState.verseNum),
+                        api.getVerseTranslations(viewState.surahId, viewState.verseNum),
+                        api.getVerseParts(viewState.surahId, viewState.verseNum)
+                        ]);
+                        const filteredTranslations = (translationsData || []).filter(t => {
+                        const name = (t.author?.name || t.author || '').toLocaleLowerCase('tr-TR');
+                        return ALLOWED_TR.some(k => name.includes(k)) || ALLOWED_EN.some(k => name.includes(k));
+                        });
+                        data = { fullVerse, words, translations: filteredTranslations, verseparts };
+                        break;
+                    case 'root_detail':
+                        const detail = await api.getRootByLatin(viewState.latin);
+                        const versesResp = await api.getRootVerseParts(viewState.latin, viewState.page || 1, selectedAuthor);
+                        data = { detail, verses: versesResp.data, meta: versesResp.meta };
+                        break;
+                    case 'search':
+                        const searchResp = await api.search(viewState.query, selectedAuthor);
+                        data = searchResp;
+                        break;
+                    default:
+                        break;
+                    }
+                    if (isMounted) setViewData(data);
+                } catch (err) {
+                    if (isMounted) setError('Veri yüklenirken bir hata oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.');
+                    console.error(err);
+                } finally {
+                    if (isMounted) setLoading(false);
+                }
+                };
+
+                fetchViewData();
+                return () => { isMounted = false; };
+            }, [viewState, selectedAuthor]);
+
+            // Eylemler (Actions)
+            const navigateTo = (newState) => {
+                setSidebarOpen(false); // Navigasyon anında mobil menüyü kapa
+                setViewState(newState);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const handleSearchSubmit = (e) => {
+                e.preventDefault();
+                if (searchQuery.trim().length > 2) {
+                document.activeElement.blur(); // Mobilde klavyeyi kapatır
+                navigateTo({ type: 'search', query: searchQuery.trim() });
+                }
+            };
+
+            const loadRootsForChar = async (charId) => {
+                try {
+                const roots = await api.getRootsByChar(charId);
+                setCharRoots({ charId, roots });
+                } catch(err) { console.error(err); }
+            };
+
+            return (
+                <div className="flex h-screen w-full relative">
+                    {/* Mobil Sidebar Overlay */}
+                    {sidebarOpen && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+
+                    <Sidebar 
+                        sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
+                        navTab={navTab} setNavTab={setNavTab}
+                        surahs={surahs} viewState={viewState}
+                        navigateTo={navigateTo} rootChars={rootChars}
+                        charRoots={charRoots} setCharRoots={setCharRoots}
+                        loadRootsForChar={loadRootsForChar}
+                    />
+
+                    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                        
+                        {/* HEADER */}
+                        <header className="bg-white/90 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-20 px-4 py-3 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center space-x-3">
+                            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 bg-gray-50 hover:bg-emerald-50 rounded-xl text-emerald-700 transition-all">
+                            <List className="w-5 h-5" />
+                            </button>
+                            <div className="flex items-center space-x-2 text-emerald-950 cursor-pointer group" onClick={() => navigateTo({ type: 'home' })}>
+                            <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center shadow-md shadow-emerald-200 group-hover:bg-emerald-700 transition-colors">
+                                <BookOpen className="w-5 h-5 text-white" />
+                            </div>
+                            <h1 className="font-extrabold text-lg hidden sm:block tracking-tight uppercase">Kur’ân-ı<span className="text-emerald-600">Kerîm</span></h1>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center flex-1 max-w-md mx-4 hidden md:block">
+                            <form onSubmit={handleSearchSubmit} className="relative w-full">
+                            <input 
+                                type="text" 
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Kur'an'da kelime veya meal ara..." 
+                                className="w-full bg-gray-50 border border-gray-100 text-sm rounded-full pl-10 pr-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                            />
+                            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600">
+                                <Search className="w-4 h-4" />
+                            </button>
+                            </form>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                            <div className="relative group min-w-[140px]">
+                            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 pointer-events-none" />
+                            <select 
+                                value={selectedAuthor} 
+                                onChange={(e) => setSelectedAuthor(parseInt(e.target.value))}
+                                className="w-full bg-emerald-50/50 border border-emerald-100 text-emerald-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2.5 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all appearance-none cursor-pointer hover:bg-emerald-50"
+                            >
+                                {authors.map(a => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                                ))}
+                            </select>
+                            </div>
+                        </div>
+                        </header>
+
+                        {/* MOBİL ARAMA (Yalnızca mobilde görünür) */}
+                        <div className="md:hidden bg-white px-4 py-2 border-b border-gray-100">
+                        <form onSubmit={handleSearchSubmit} className="relative w-full">
+                            <input 
+                            type="text" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Kur'an'da ara..." 
+                            className="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl pl-10 pr-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            />
+                            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <Search className="w-4 h-4" />
+                            </button>
+                        </form>
+                        </div>
+
+                        {/* ANA İÇERİK (MAIN CONTENT) */}
+                        <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#fafafa]/50">
+                        {loading ? <LoadingView /> : error ? <ErrorView msg={error} onReturnHome={() => navigateTo({type: 'home'})} /> : (
+                            <div className="pb-20">
+                            {viewState.type === 'home' && <HomeView navigateTo={navigateTo} onOpenDictionary={() => { setSidebarOpen(true); setNavTab('dictionary'); }} />}
+                            {viewState.type === 'surah' && <ReadingView viewData={viewData} navigateTo={navigateTo} />}
+                            {viewState.type === 'page' && <PageReadingView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
+                            {viewState.type === 'verse_detail' && <VerseDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
+                            {viewState.type === 'root_detail' && <RootDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
+                            {viewState.type === 'search' && <SearchView viewData={viewData} viewState={viewState} navigateTo={navigateTo} />}
+                            </div>
+                        )}
+                        </main>
+
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // REACT UYGULAMASINI BAŞLAT
+        // ==========================================
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
+</body>
+</html>
