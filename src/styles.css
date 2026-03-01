@@ -52,7 +52,8 @@
             text-align: justify;
             text-justify: inter-word;
             text-align-last: center; 
-            line-height: 2.6 !important; 
+            line-height: 2.7 !important;
+            letter-spacing: 0.01em;
             direction: rtl;
         }
         .ayah-marker {
@@ -60,6 +61,57 @@
             white-space: nowrap; 
             margin: 0 0.3rem;
             user-select: none;
+        }
+        .mushaf-sheet::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.08;
+            background-image: radial-gradient(circle at 1px 1px, #94a3b8 1px, transparent 0);
+            background-size: 22px 22px;
+        }
+        .dark .mushaf-sheet::before {
+            opacity: 0.05;
+        }
+        .mushaf-frame::after {
+            content: "";
+            position: absolute;
+            inset: 8px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 1rem;
+        }
+        .mushaf-surah-head {
+            position: relative;
+        }
+        .mushaf-title-wrap {
+            min-width: min(92%, 30rem);
+        }
+        .mushaf-title {
+            letter-spacing: 0.02em;
+        }
+        .mushaf-basmalah {
+            padding: 0.9rem 1.25rem;
+            border-top: 1px solid rgba(16, 185, 129, 0.2);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 0.9rem;
+        }
+        .dark .mushaf-basmalah {
+            background: rgba(15, 23, 42, 0.45);
+        }
+        .mushaf-word {
+            padding-inline: 0.08em;
+        }
+        .mushaf-ayah-marker {
+            padding: 0.05em 0.2em;
+            border-radius: 9999px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.08);
+        }
+        .dark .mushaf-ayah-marker {
+            border-color: rgba(16, 185, 129, 0.35);
+            background: rgba(16, 185, 129, 0.14);
         }
 
         /* Erişilebilir Odak Göstergeleri */

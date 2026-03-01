@@ -236,18 +236,18 @@ import './styles.css';
                 )}
 
                 {viewMode === 'mushaf' ? (
-                    <div className="mushaf-page p-6 md:p-14 rounded-[2.5rem] shadow-sm relative overflow-hidden">
-                        <div className="absolute inset-3 md:inset-5 border-2 border-emerald-100/60 dark:border-slate-800/80 rounded-[1.5rem] pointer-events-none"></div>
+                    <div className="mushaf-page mushaf-sheet p-8 md:p-16 rounded-[2.5rem] shadow-sm relative overflow-hidden">
+                        <div className="mushaf-frame absolute inset-3 md:inset-5 border-2 border-emerald-100/60 dark:border-slate-800/80 rounded-[1.5rem] pointer-events-none"></div>
                         
                         <div className="relative z-10">
-                            <div className="text-center mb-10 pb-8 border-b-2 border-emerald-100/50 dark:border-slate-800/80">
-                                <div className="bg-emerald-50/80 dark:bg-slate-800/80 border border-emerald-200/50 dark:border-slate-700 rounded-full py-4 px-12 inline-block shadow-sm">
-                                    <h2 className="text-4xl md:text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-400">{viewData.name_original}</h2>
+                            <div className="mushaf-surah-head text-center mb-10 pb-8 border-b-2 border-emerald-100/50 dark:border-slate-800/80">
+                                <div className="mushaf-title-wrap bg-emerald-50/80 dark:bg-slate-800/80 border border-emerald-200/50 dark:border-slate-700 rounded-full py-4 px-12 inline-block shadow-sm">
+                                    <h2 className="mushaf-title text-4xl md:text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-400">{viewData.name_original}</h2>
                                 </div>
                             </div>
                             
                             {viewData.zero && (
-                                <div className="text-center mb-10">
+                                <div className="mushaf-basmalah text-center mb-10">
                                     <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-slate-800 dark:text-slate-200 leading-loose`} dir="rtl">
                                         {viewData.zero.verse}
                                     </p>
@@ -258,13 +258,13 @@ import './styles.css';
                                 {viewData.verses?.map((verse) => (
                                     <Fragment key={verse.id}>
                                         <span 
-                                            className="hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer rounded-md transition-colors"
+                                            className="mushaf-word hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer rounded-md transition-colors"
                                             onClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })}
                                             title={`${viewData.name} Suresi, ${verse.verse_number}. Ayet Detayı`}
                                         >
                                             {verse.verse}
                                         </span>
-                                        <span className="ayah-marker text-emerald-700 dark:text-emerald-500 font-arabic-amiri font-bold text-[0.9em]">
+                                        <span className="ayah-marker mushaf-ayah-marker text-emerald-700 dark:text-emerald-500 font-arabic-amiri font-bold text-[0.9em]">
                                             ﴾{toArabicNumber(verse.verse_number)}﴿
                                         </span>
                                     </Fragment>
@@ -314,21 +314,21 @@ import './styles.css';
                 </div>
 
                 {viewMode === 'mushaf' ? (
-                    <div className="mushaf-page p-6 md:p-14 rounded-[2.5rem] shadow-sm relative overflow-hidden">
-                        <div className="absolute inset-3 md:inset-5 border-2 border-emerald-100/60 dark:border-slate-800/80 rounded-[1.5rem] pointer-events-none"></div>
+                    <div className="mushaf-page mushaf-sheet p-8 md:p-16 rounded-[2.5rem] shadow-sm relative overflow-hidden">
+                        <div className="mushaf-frame absolute inset-3 md:inset-5 border-2 border-emerald-100/60 dark:border-slate-800/80 rounded-[1.5rem] pointer-events-none"></div>
                         
                         <div className="relative z-10 space-y-12">
                             {groupedVerses.map((group, gIdx) => (
                                 <div key={group.surahId || gIdx}>
                                     {group.surah && (
-                                        <div className="text-center mb-8 pb-8 border-b-2 border-emerald-100/50 dark:border-slate-800/80 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigateTo({ type: 'surah', surahId: group.surah.id })}>
-                                            <div className="bg-emerald-50/80 dark:bg-slate-800/80 border border-emerald-200/50 dark:border-slate-700 rounded-full py-4 px-12 inline-block shadow-sm">
-                                                <h2 className="text-4xl md:text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-400">{group.surah.name_original}</h2>
+                                        <div className="mushaf-surah-head text-center mb-8 pb-8 border-b-2 border-emerald-100/50 dark:border-slate-800/80 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigateTo({ type: 'surah', surahId: group.surah.id })}>
+                                            <div className="mushaf-title-wrap bg-emerald-50/80 dark:bg-slate-800/80 border border-emerald-200/50 dark:border-slate-700 rounded-full py-4 px-12 inline-block shadow-sm">
+                                                <h2 className="mushaf-title text-4xl md:text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-400">{group.surah.name_original}</h2>
                                             </div>
                                         </div>
                                     )}
                                     {group.zero && (
-                                        <div className="text-center mb-10">
+                                        <div className="mushaf-basmalah text-center mb-10">
                                             <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-slate-800 dark:text-slate-200 leading-loose`} dir="rtl">{group.zero.verse}</p>
                                         </div>
                                     )}
@@ -336,12 +336,12 @@ import './styles.css';
                                         {group.verses.map(verse => (
                                             <Fragment key={verse.id}>
                                                 <span 
-                                                    className="hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer rounded-md transition-colors"
+                                                    className="mushaf-word hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 cursor-pointer rounded-md transition-colors"
                                                     onClick={() => navigateTo({ type: 'verse_detail', surahId: group.surah?.id || verse.surah?.id, verseNum: verse.verse_number })}
                                                 >
                                                     {verse.verse}
                                                 </span>
-                                                <span className="ayah-marker text-emerald-700 dark:text-emerald-500 font-arabic-amiri font-bold text-[0.9em]">
+                                                <span className="ayah-marker mushaf-ayah-marker text-emerald-700 dark:text-emerald-500 font-arabic-amiri font-bold text-[0.9em]">
                                                     ﴾{toArabicNumber(verse.verse_number)}﴿
                                                 </span>
                                             </Fragment>
