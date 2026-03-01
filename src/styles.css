@@ -49,12 +49,18 @@
             border: 1px solid #1e293b;
         }
         .mushaf-layout {
+            display: block;
+            max-width: 34em;
+            margin-inline: auto;
+            padding-inline: 0.2em;
             text-align: justify;
             text-justify: inter-word;
             text-align-last: center; 
             line-height: 2.7 !important;
             letter-spacing: 0.01em;
+            word-spacing: 0.07em;
             direction: rtl;
+            hanging-punctuation: first last;
         }
         .ayah-marker {
             display: inline-block;
@@ -102,6 +108,21 @@
         }
         .mushaf-word {
             padding-inline: 0.08em;
+        }
+
+        @media (max-width: 768px) {
+            .mushaf-layout {
+                max-width: 100%;
+                line-height: 2.55 !important;
+                word-spacing: 0.05em;
+                padding-inline: 0.1em;
+            }
+        }
+
+        @media (min-width: 1280px) {
+            .mushaf-layout {
+                max-width: 35.5em;
+            }
         }
         .mushaf-ayah-marker {
             padding: 0.05em 0.2em;
