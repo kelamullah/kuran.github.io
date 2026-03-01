@@ -74,6 +74,14 @@
         .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748B; }
 
+        /* Mushaf Modu için Satır Yüksekliği Ayarı */
+        .mushaf-layout {
+            text-align: justify;
+            text-align-last: center; /* Son satırı da ortalar, tam bir blok görünümü sağlar */
+            line-height: 2.2; /* Satırlar arası boşluk */
+            direction: rtl;
+        }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideInBottom { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes slideInRight { from { transform: translateX(1rem); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -138,6 +146,12 @@
             { id: 'amiri', name: 'Sistem (Amiri)', className: 'font-arabic-amiri' }
         ];
 
+        // Arapça Ayet Numarası Çevirici
+        const toArabicNumber = (num) => {
+            const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+            return num.toString().split('').map(digit => arabicNumbers[parseInt(digit)]).join('');
+        };
+
         class ApiService {
             constructor() { this.cache = new Map(); }
             async fetch(endpoint) {
@@ -170,6 +184,8 @@
         // ==========================================
         // YARDIMCI BİLEŞENLER
         // ==========================================
+        
+        // Klasik Alt Alta Çevirili Görünüm (Meal Modu)
         const VerseCard = memo(({ verse, onDetailClick, hideActions = false, sizes }) => {
             const [copied, setCopied] = useState(false);
             const { arabicSize, transSize, arabicFontClass } = sizes;
@@ -274,7 +290,7 @@
             </div>
         );
 
-        const ReadingView = ({ viewData, navigateTo, sizes }) => {
+        const ReadingView = ({ viewData, navigateTo, sizes, viewMode }) => {
             if (!viewData || !viewData.verses) return null;
             return (
                 <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in slide-in-from-bottom-4">
@@ -299,24 +315,58 @@
                 {viewData.zero && (
                     <div className="text-center mb-16 py-8 border-y border-emerald-50 dark:border-slate-800">
                     <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-800 dark:text-gray-200 leading-loose mb-4 transition-all`} dir="rtl">{viewData.zero.verse}</p>
-                    <p className={`text-gray-500 dark:text-slate-400 italic ${FONT_SIZES.translation[sizes.transSize]} transition-all`}>{viewData.zero.translation?.text}</p>
+                    {viewMode === 'meal' && (
+                        <p className={`text-gray-500 dark:text-slate-400 italic ${FONT_SIZES.translation[sizes.transSize]} transition-all`}>{viewData.zero.translation?.text}</p>
+                    )}
                     </div>
                 )}
 
-                <div className="space-y-4">
-                    {viewData.verses?.map(verse => <VerseCard key={verse.id} verse={verse} onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })} sizes={sizes} />)}
-                </div>
+                {/* GÖRÜNÜM MODUNA GÖRE RENDER (Meal veya Mushaf) */}
+                {viewMode === 'mushaf' ? (
+                    <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[32px] shadow-sm border border-gray-100 dark:border-slate-800">
+                        <p className={`mushaf-layout ${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-900 dark:text-gray-100 transition-all`}>
+                            {viewData.verses?.map((verse, index) => (
+                                <Fragment key={verse.id}>
+                                    <span 
+                                        className="hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer rounded transition-colors px-1"
+                                        onClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })}
+                                        title={`${viewData.name} Suresi, ${verse.verse_number}. Ayet Detayı`}
+                                    >
+                                        {verse.verse}
+                                    </span>
+                                    <span className="text-emerald-600 dark:text-emerald-500 mx-1.5 font-arabic-amiri">
+                                        ﴾{toArabicNumber(verse.verse_number)}﴿
+                                    </span>
+                                </Fragment>
+                            ))}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {viewData.verses?.map(verse => <VerseCard key={verse.id} verse={verse} onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: viewData.id, verseNum: verse.verse_number })} sizes={sizes} />)}
+                    </div>
+                )}
                 </div>
             );
         };
 
-        const PageReadingView = ({ viewData, viewState, navigateTo, sizes }) => {
+        const PageReadingView = ({ viewData, viewState, navigateTo, sizes, viewMode }) => {
             // Güvenli veri kontrolü
             const verses = Array.isArray(viewData) ? viewData : (viewData?.verses || null);
             if (!verses) return null; // Veri yüklenene kadar sessizce bekle
             if (verses.length === 0) return <ErrorView msg="Bu sayfa için veri bulunamadı." onReturnHome={() => navigateTo({type: 'home'})} />;
             
             let currentSurahTracker = null;
+            
+            // Mushaf modu için surelere göre gruplama yap (Aynı sayfada birden fazla sure olabilir)
+            const groupedVerses = [];
+            verses.forEach(verse => {
+                const surahId = verse.surah?.id;
+                if (!groupedVerses.length || groupedVerses[groupedVerses.length - 1].surahId !== surahId) {
+                    groupedVerses.push({ surahId, surah: verse.surah, zero: verse.verse_number === 1 ? verse.zero : null, verses: [] });
+                }
+                groupedVerses[groupedVerses.length - 1].verses.push(verse);
+            });
 
             return (
                 <div className="max-w-4xl mx-auto p-4 md:p-8 fade-in">
@@ -330,28 +380,63 @@
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    {verses.map(verse => {
-                    const isNewSurah = currentSurahTracker !== verse.surah?.id;
-                    currentSurahTracker = verse.surah?.id;
-                    return (
-                        <Fragment key={verse.id}>
-                        {isNewSurah && verse.surah && (
-                            <div className="text-center my-12 p-8 bg-emerald-50/40 dark:bg-slate-900 rounded-[24px] border border-emerald-100 dark:border-slate-800 shadow-sm zoom-in-95 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-slate-800 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: verse.surah.id })}>
-                            <h2 className="text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-500 mb-3">{verse.surah.name_original}</h2>
-                            <p className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-[0.2em] text-sm">{verse.surah.name} Suresi</p>
+                {viewMode === 'mushaf' ? (
+                    <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[32px] shadow-sm border border-gray-100 dark:border-slate-800 space-y-12">
+                        {groupedVerses.map((group, gIdx) => (
+                            <div key={group.surahId || gIdx}>
+                                {group.surah && (
+                                    <div className="text-center mb-8 pb-8 border-b border-gray-100 dark:border-slate-800 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigateTo({ type: 'surah', surahId: group.surah.id })}>
+                                        <h2 className="text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-500 mb-2">{group.surah.name_original}</h2>
+                                        <p className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-[0.2em] text-xs">{group.surah.name} Suresi</p>
+                                    </div>
+                                )}
+                                {group.zero && (
+                                    <div className="text-center mb-8">
+                                        <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-700 dark:text-gray-300 leading-loose`} dir="rtl">{group.zero.verse}</p>
+                                    </div>
+                                )}
+                                <p className={`mushaf-layout ${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-900 dark:text-gray-100 transition-all`}>
+                                    {group.verses.map(verse => (
+                                        <Fragment key={verse.id}>
+                                            <span 
+                                                className="hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer rounded transition-colors px-1"
+                                                onClick={() => navigateTo({ type: 'verse_detail', surahId: group.surah?.id || verse.surah?.id, verseNum: verse.verse_number })}
+                                            >
+                                                {verse.verse}
+                                            </span>
+                                            <span className="text-emerald-600 dark:text-emerald-500 mx-1.5 font-arabic-amiri">
+                                                ﴾{toArabicNumber(verse.verse_number)}﴿
+                                            </span>
+                                        </Fragment>
+                                    ))}
+                                </p>
                             </div>
-                        )}
-                        {verse.zero && verse.verse_number === 1 && (
-                            <div className="text-center mb-10 pb-6 border-b border-emerald-50 dark:border-slate-800">
-                            <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-700 dark:text-gray-300 leading-loose`} dir="rtl">{verse.zero.verse}</p>
-                            </div>
-                        )}
-                        <VerseCard verse={verse} onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah?.id, verseNum: verse.verse_number })} sizes={sizes} />
-                        </Fragment>
-                    );
-                    })}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {verses.map(verse => {
+                        const isNewSurah = currentSurahTracker !== verse.surah?.id;
+                        currentSurahTracker = verse.surah?.id;
+                        return (
+                            <Fragment key={verse.id}>
+                            {isNewSurah && verse.surah && (
+                                <div className="text-center my-12 p-8 bg-emerald-50/40 dark:bg-slate-900 rounded-[24px] border border-emerald-100 dark:border-slate-800 shadow-sm zoom-in-95 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-slate-800 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: verse.surah.id })}>
+                                <h2 className="text-5xl font-arabic-amiri font-bold text-emerald-950 dark:text-emerald-500 mb-3">{verse.surah.name_original}</h2>
+                                <p className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-[0.2em] text-sm">{verse.surah.name} Suresi</p>
+                                </div>
+                            )}
+                            {verse.zero && verse.verse_number === 1 && (
+                                <div className="text-center mb-10 pb-6 border-b border-emerald-50 dark:border-slate-800">
+                                <p className={`${FONT_SIZES.arabic[sizes.arabicSize]} ${sizes.arabicFontClass} text-gray-700 dark:text-gray-300 leading-loose`} dir="rtl">{verse.zero.verse}</p>
+                                </div>
+                            )}
+                            <VerseCard verse={verse} onDetailClick={() => navigateTo({ type: 'verse_detail', surahId: verse.surah?.id, verseNum: verse.verse_number })} sizes={sizes} />
+                            </Fragment>
+                        );
+                        })}
+                    </div>
+                )}
                 </div>
             );
         };
@@ -684,6 +769,7 @@
             const [arabicSize, setArabicSize] = useState(() => parseInt(localStorage.getItem('arabicSize')) || 1); // Varsayılan: text-3xl
             const [transSize, setTransSize] = useState(() => parseInt(localStorage.getItem('transSize')) || 2); // Varsayılan: text-lg
             const [arabicFontId, setArabicFontId] = useState(() => localStorage.getItem('arabicFontId') || 'abay'); // Varsayılan: Abay
+            const [viewMode, setViewMode] = useState(() => localStorage.getItem('viewMode') || 'meal'); // 'meal' veya 'mushaf'
             
             const activeArabicFontClass = ARABIC_FONTS.find(f => f.id === arabicFontId)?.className || 'font-arabic-abay';
             const currentSizes = { arabicSize, transSize, arabicFontClass: activeArabicFontClass };
@@ -696,6 +782,7 @@
             useEffect(() => { localStorage.setItem('arabicSize', arabicSize); }, [arabicSize]);
             useEffect(() => { localStorage.setItem('transSize', transSize); }, [transSize]);
             useEffect(() => { localStorage.setItem('arabicFontId', arabicFontId); }, [arabicFontId]);
+            useEffect(() => { localStorage.setItem('viewMode', viewMode); }, [viewMode]);
 
             // Dışarı tıklayınca ayarlar menüsünü kapat
             useEffect(() => {
@@ -852,7 +939,20 @@
                                             </div>
                                         </div>
                                         <div className="space-y-5">
-                                            {/* Font Seçimi Eklendi */}
+                                            {/* GÖRÜNÜM SEÇİMİ (Yeni) */}
+                                            <div>
+                                                <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 block">Görünüm</span>
+                                                <div className="flex bg-gray-50 dark:bg-slate-800 rounded-lg p-1">
+                                                    <button onClick={() => setViewMode('meal')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-colors ${viewMode === 'meal' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'}`}>
+                                                        Meal
+                                                    </button>
+                                                    <button onClick={() => setViewMode('mushaf')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-colors ${viewMode === 'mushaf' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'}`}>
+                                                        Mushaf
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Font Seçimi */}
                                             <div>
                                                 <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 block">Arapça Fontu</span>
                                                 <div className="grid grid-cols-2 gap-2">
@@ -874,13 +974,17 @@
                                                     <button onClick={() => setArabicSize(Math.min(FONT_SIZES.arabic.length - 1, arabicSize + 1))} className="flex-1 py-1 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm text-gray-600 dark:text-slate-300"><APlus className="w-4 h-4"/></button>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 block">Meal Boyutu</span>
-                                                <div className="flex bg-gray-50 dark:bg-slate-800 rounded-lg p-1">
-                                                    <button onClick={() => setTransSize(Math.max(0, transSize - 1))} className="flex-1 py-1 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm text-gray-600 dark:text-slate-300"><AMinus className="w-4 h-4"/></button>
-                                                    <button onClick={() => setTransSize(Math.min(FONT_SIZES.translation.length - 1, transSize + 1))} className="flex-1 py-1 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm text-gray-600 dark:text-slate-300"><APlus className="w-4 h-4"/></button>
+                                            
+                                            {/* Sadece Meal modundaysa göster */}
+                                            {viewMode === 'meal' && (
+                                                <div>
+                                                    <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 block">Meal Boyutu</span>
+                                                    <div className="flex bg-gray-50 dark:bg-slate-800 rounded-lg p-1">
+                                                        <button onClick={() => setTransSize(Math.max(0, transSize - 1))} className="flex-1 py-1 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm text-gray-600 dark:text-slate-300"><AMinus className="w-4 h-4"/></button>
+                                                        <button onClick={() => setTransSize(Math.min(FONT_SIZES.translation.length - 1, transSize + 1))} className="flex-1 py-1 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm text-gray-600 dark:text-slate-300"><APlus className="w-4 h-4"/></button>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -892,8 +996,8 @@
                         {loading ? <LoadingView /> : error ? <ErrorView msg={error} onReturnHome={() => navigateTo({type: 'home'})} /> : (
                             <div className="pb-20">
                             {viewState.type === 'home' && <HomeView navigateTo={navigateTo} onOpenDictionary={() => { setSidebarOpen(true); setNavTab('dictionary'); }} />}
-                            {viewState.type === 'surah' && <ReadingView viewData={viewData} navigateTo={navigateTo} sizes={currentSizes} />}
-                            {viewState.type === 'page' && <PageReadingView viewData={viewData} viewState={viewState} navigateTo={navigateTo} sizes={currentSizes} />}
+                            {viewState.type === 'surah' && <ReadingView viewData={viewData} navigateTo={navigateTo} sizes={currentSizes} viewMode={viewMode} />}
+                            {viewState.type === 'page' && <PageReadingView viewData={viewData} viewState={viewState} navigateTo={navigateTo} sizes={currentSizes} viewMode={viewMode} />}
                             {viewState.type === 'verse_detail' && <VerseDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} sizes={currentSizes} />}
                             {viewState.type === 'root_detail' && <RootDetailView viewData={viewData} viewState={viewState} navigateTo={navigateTo} sizes={currentSizes} />}
                             {viewState.type === 'search' && <SearchView viewData={viewData} viewState={viewState} navigateTo={navigateTo} sizes={currentSizes} />}
