@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, Fragment, useRef } from 'react';
+import { useState, useEffect, memo, Fragment, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -51,9 +51,15 @@ import './styles.css';
         };
 
         class ApiService {
-            constructor() { this.cache = new Map(); }
+            constructor() {
+                this.cache = new Map();
+                this.pending = new Map();
+            }
             async fetch(endpoint) {
                 if (this.cache.has(endpoint)) return this.cache.get(endpoint);
+                if (this.pending.has(endpoint)) return this.pending.get(endpoint);
+
+                const request = (async () => {
                 try {
                     const response = await fetch(`${API_BASE_URL}${endpoint}`);
                     if (!response.ok) throw new Error(`HTTP hatası! Durum: ${response.status}`);
@@ -62,6 +68,13 @@ import './styles.css';
                     this.cache.set(endpoint, result);
                     return result;
                 } catch (error) { throw error; }
+                finally {
+                    this.pending.delete(endpoint);
+                }
+                })();
+
+                this.pending.set(endpoint, request);
+                return request;
             }
             getAuthors() { return this.fetch('/authors'); }
             getSurahs() { return this.fetch('/surahs'); }
@@ -115,7 +128,7 @@ import './styles.css';
                         </span>
                     )}
                     
-                    <button onClick={() => copyToClipboard(verse.verse)} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors" title="Arapça Metni Kopyala">
+                    <button onClick={() => copyToClipboard(verse.verse)} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors" title="Arapça Metni Kopyala" aria-label="Arapça metni kopyala">
                         {copied ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                     </div>
@@ -294,9 +307,9 @@ import './styles.css';
                     Sayfa {viewState.pageNum}
                     </h2>
                     <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 rounded-full p-1 shadow-sm">
-                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum - 1 })} disabled={viewState.pageNum <= 1} className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum - 1 })} disabled={viewState.pageNum <= 1} className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors" aria-label="Önceki sayfaya git"><ChevronLeft className="w-5 h-5"/></button>
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
-                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum + 1 })} disabled={viewState.pageNum >= 604} className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5"/></button>
+                    <button onClick={() => navigateTo({ type: 'page', pageNum: viewState.pageNum + 1 })} disabled={viewState.pageNum >= 604} className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors" aria-label="Sonraki sayfaya git"><ChevronRight className="w-5 h-5"/></button>
                     </div>
                 </div>
 
@@ -506,7 +519,7 @@ import './styles.css';
                             <div className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-full cursor-pointer hover:bg-emerald-100 dark:hover:bg-slate-700 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors" onClick={() => navigateTo({ type: 'surah', surahId: item.surah.id })}>
                             {item.surah.name} : {item.verse.verse_number}
                             </div>
-                            <button onClick={() => navigateTo({ type: 'verse_detail', surahId: item.surah.id, verseNum: item.verse.verse_number })} className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                            <button onClick={() => navigateTo({ type: 'verse_detail', surahId: item.surah.id, verseNum: item.verse.verse_number })} className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors" aria-label={`${item.surah.name} ${item.verse.verse_number}. ayet detayını aç`}>
                             <ArrowRight className="w-5 h-5"/>
                             </button>
                         </div>
@@ -586,7 +599,9 @@ import './styles.css';
         };
 
         // Material You Tasarımlı Yan Menü (Navigation Rail / Drawer)
-        const Sidebar = ({ sidebarOpen, navTab, setNavTab, surahs, viewState, navigateTo, rootChars, charRoots, setCharRoots, loadRootsForChar, sizes }) => (
+        const Sidebar = ({ sidebarOpen, navTab, setNavTab, surahs, viewState, navigateTo, rootChars, charRoots, setCharRoots, loadRootsForChar, sizes }) => {
+            const pageNumbers = useMemo(() => Array.from({ length: 604 }, (_, i) => i + 1), []);
+            return (
             <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-80 bg-slate-100 dark:bg-slate-900 transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                 
                 {/* Segmented Navigation (Pill-shaped) */}
@@ -632,7 +647,7 @@ import './styles.css';
                         <button onClick={() => { const val = document.getElementById('pageJump').value; if(val) navigateTo({ type: 'page', pageNum: parseInt(val) }, true); }} className="bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm transition-colors hover:text-emerald-800 dark:hover:text-emerald-200">Git</button>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
-                        {Array.from({length: 604}, (_, i) => i + 1).map(p => {
+                        {pageNumbers.map(p => {
                         const isActive = viewState.type === 'page' && viewState.pageNum === p;
                         return (
                             <button key={p} onClick={()=>navigateTo({ type: 'page', pageNum: p }, true)} className={`p-3 text-sm rounded-full transition-all ${isActive ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'}`}>
@@ -673,7 +688,8 @@ import './styles.css';
                 )}
                 </div>
             </aside>
-        );
+            );
+        };
 
         // ==========================================
         // ANA UYGULAMA (APP) BİLE�?ENİ
@@ -817,7 +833,7 @@ import './styles.css';
                         {/* Top App Bar (Material 3 Style) */}
                         <header className="bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-2xl sticky top-0 z-20 px-4 py-4 md:px-8 flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-3 bg-white dark:bg-slate-800 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm">
+                            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-3 bg-white dark:bg-slate-800 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm" aria-label={sidebarOpen ? 'Menüyü kapat' : 'Menüyü aç'}>
                                 <MenuIcon className="w-6 h-6" />
                             </button>
                             <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => navigateTo({ type: 'home' })}>
@@ -830,8 +846,8 @@ import './styles.css';
                         
                         <div className="flex items-center flex-1 max-w-xl mx-6 hidden md:block">
                             <form onSubmit={handleSearchSubmit} className="relative w-full group">
-                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Kur'an'da ara..." className="w-full bg-slate-200/70 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base rounded-full pl-14 pr-6 py-4 outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-emerald-500/20 transition-all placeholder-slate-500 dark:placeholder-slate-400" />
-                            <button type="submit" className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors">
+                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Kur'an'da ara..." className="w-full bg-slate-200/70 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base rounded-full pl-14 pr-6 py-4 outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-emerald-500/20 transition-all placeholder-slate-500 dark:placeholder-slate-400" aria-label="Kur'an içinde ara" />
+                            <button type="submit" className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors" aria-label="Aramayı başlat">
                                 <Search className="w-5 h-5" />
                             </button>
                             </form>
@@ -840,14 +856,14 @@ import './styles.css';
                         <div className="flex items-center space-x-3">
                             <div className="relative hidden sm:block">
                                 <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 dark:text-slate-400 pointer-events-none" />
-                                <select value={selectedAuthor} onChange={(e) => setSelectedAuthor(parseInt(e.target.value))} className="bg-slate-200/70 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 text-sm font-bold rounded-full pl-11 pr-10 py-3.5 outline-none hover:bg-slate-300/70 dark:hover:bg-slate-700 transition-colors appearance-none cursor-pointer">
+                                <select value={selectedAuthor} onChange={(e) => setSelectedAuthor(parseInt(e.target.value))} className="bg-slate-200/70 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 text-sm font-bold rounded-full pl-11 pr-10 py-3.5 outline-none hover:bg-slate-300/70 dark:hover:bg-slate-700 transition-colors appearance-none cursor-pointer" aria-label="Meal yazarı seçimi">
                                     {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                 </select>
                             </div>
 
                             {/* Ayarlar FAB/Butonu */}
                             <div className="relative" ref={settingsRef}>
-                                <button onClick={() => setShowSettings(!showSettings)} className="p-3.5 bg-slate-200/70 dark:bg-slate-800/80 hover:bg-emerald-100 dark:hover:bg-slate-700 rounded-full text-slate-700 dark:text-slate-300 transition-colors">
+                                <button onClick={() => setShowSettings(!showSettings)} className="p-3.5 bg-slate-200/70 dark:bg-slate-800/80 hover:bg-emerald-100 dark:hover:bg-slate-700 rounded-full text-slate-700 dark:text-slate-300 transition-colors" aria-label={showSettings ? 'Ayarları kapat' : 'Ayarları aç'}>
                                     <Settings className="w-6 h-6" />
                                 </button>
                                 
@@ -856,7 +872,7 @@ import './styles.css';
                                         <div className="mb-6 pb-6 border-b border-slate-100 dark:border-slate-700/50">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-base font-extrabold text-slate-800 dark:text-slate-100">Ayarlar</span>
-                                                <button onClick={() => setDarkMode(!darkMode)} className="p-3 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                                                <button onClick={() => setDarkMode(!darkMode)} className="p-3 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors" aria-label={darkMode ? 'Açık moda geç' : 'Koyu moda geç'}>
                                                     {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                                                 </button>
                                             </div>
@@ -891,8 +907,8 @@ import './styles.css';
                                             <div>
                                                 <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 block pl-2">Arapça Boyutu</span>
                                                 <div className="flex bg-slate-100 dark:bg-slate-900 rounded-full p-1.5">
-                                                    <button onClick={() => setArabicSize(Math.max(0, arabicSize - 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors"><AMinus className="w-5 h-5"/></button>
-                                                    <button onClick={() => setArabicSize(Math.min(FONT_SIZES.arabic.length - 1, arabicSize + 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors"><APlus className="w-5 h-5"/></button>
+                                                    <button onClick={() => setArabicSize(Math.max(0, arabicSize - 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors" aria-label="Arapça yazı boyutunu küçült"><AMinus className="w-5 h-5"/></button>
+                                                    <button onClick={() => setArabicSize(Math.min(FONT_SIZES.arabic.length - 1, arabicSize + 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors" aria-label="Arapça yazı boyutunu büyüt"><APlus className="w-5 h-5"/></button>
                                                 </div>
                                             </div>
                                             
@@ -900,8 +916,8 @@ import './styles.css';
                                                 <div>
                                                     <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 block pl-2">Meal Boyutu</span>
                                                     <div className="flex bg-slate-100 dark:bg-slate-900 rounded-full p-1.5">
-                                                        <button onClick={() => setTransSize(Math.max(0, transSize - 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors"><AMinus className="w-5 h-5"/></button>
-                                                        <button onClick={() => setTransSize(Math.min(FONT_SIZES.translation.length - 1, transSize + 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors"><APlus className="w-5 h-5"/></button>
+                                                        <button onClick={() => setTransSize(Math.max(0, transSize - 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors" aria-label="Meal yazı boyutunu küçült"><AMinus className="w-5 h-5"/></button>
+                                                        <button onClick={() => setTransSize(Math.min(FONT_SIZES.translation.length - 1, transSize + 1))} className="flex-1 py-2 flex justify-center hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-slate-700 dark:text-slate-300 transition-colors" aria-label="Meal yazı boyutunu büyüt"><APlus className="w-5 h-5"/></button>
                                                     </div>
                                                 </div>
                                             )}
@@ -915,8 +931,8 @@ import './styles.css';
                         {/* Mobil Arama */}
                         <div className="md:hidden px-4 pb-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-2xl z-10">
                             <form onSubmit={handleSearchSubmit} className="relative w-full group">
-                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Kur'an'da kelime ara..." className="w-full bg-slate-200/70 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base rounded-full pl-12 pr-6 py-3.5 outline-none focus:bg-white dark:focus:bg-slate-800 transition-all placeholder-slate-500" />
-                            <button type="submit" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400">
+                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Kur'an'da kelime ara..." className="w-full bg-slate-200/70 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base rounded-full pl-12 pr-6 py-3.5 outline-none focus:bg-white dark:focus:bg-slate-800 transition-all placeholder-slate-500" aria-label="Kur'an içinde ara" />
+                            <button type="submit" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400" aria-label="Aramayı başlat">
                                 <Search className="w-5 h-5" />
                             </button>
                             </form>
