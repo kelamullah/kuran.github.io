@@ -65,6 +65,20 @@ Not: Bu komutlar için Node.js 18+ önerilir.
 
 Örnek yayın öncesi kontrol: `npm run build` → `npm run preview`
 
+## 🚀 GitHub Pages Yayını
+
+Bu proje Vite kullandığı için, GitHub Pages üzerinde kaynak dosyayı (`/src/main.jsx`) doğrudan servis etmek boş ekran oluşturur.
+
+Repo içinde bulunan workflow dosyası build alıp `dist/` klasörünü yayınlar:
+
+- `.github/workflows/deploy-pages.yml`
+
+Gerekli ayar:
+
+1. GitHub → Settings → Pages
+2. Source olarak **GitHub Actions** seç
+3. `main` branch'e push yapınca otomatik deploy başlar
+
 ## 🔤 Font Dosyaları
 
 Aşağıdaki dosyalar `public/fonts/` klasöründe bulunmalıdır:
