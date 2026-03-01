@@ -1,84 +1,78 @@
 # 📖 Kur'ân-ı Kerîm
 
-Modern, hızlı ve tamamen tek dosyadan (**Single-Page**) oluşan kapsamlı bir Kur'an-ı Kerim okuma ve tahlil web uygulaması. Geleneksel Mushaf okuma deneyimini, **Material You (Android 17)** tasarım diliyle birleştirerek akıcı bir dijital deneyim sunar.
+Kur'ân-ı Kerîm okuma, tahlil ve kök sözlüğü deneyimi sunan React tabanlı web uygulaması.
 
----
+## ✨ Öne Çıkanlar
 
-## ✨ Özellikler
+- Meal ve Mushaf odaklı okuma modları
+- Ayet detayları, kelime/kök inceleme akışları
+- Açık Kuran API entegrasyonu
+- Karanlık mod ve tipografi özelleştirmeleri
 
-### 🕋 Çok Yönlü Okuma Deneyimi
+## 🧱 Teknoloji
 
-* **Çift Okuma Modu:** * *Meal Modu:* Ayetleri alt alta, çevirileri ve analiz araçlarıyla listeleyin.
-* *Mushaf Modu:* Geleneksel sayfa düzeninde (text-justify), odaklanmış blok okuma.
+- React 19
+- Vite 6
+- Tailwind CSS 4
+- PostCSS + Autoprefixer
 
-
-* **Özelleştirilebilir Tipografi:** * Arapça ve Türkçe metinler için bağımsız font boyutu (A+ / A-) ayarı.
-* **3 Özel Font:** Hamdullah (Varsayılan), Abay, Latif ve standart Google Amiri desteği.
-
-
-
-### 🔍 Derinlemesine Tahlil ve Araştırma
-
-* **Gelişmiş Analiz:** Ayet bazlı kelime kelime meal, gramer (sarf/nahiv) tahlili ve karşılaştırmalı mealler.
-* **Kök Sözlüğü:** Arapça köklere (sülasi vb.) göre arama; kökün geçtiği tüm ayetlerin ve kullanım istatistiklerinin listelenmesi.
-* **Sesli Dinleme:** Sure ve sayfaları yüksek kaliteli MP3 formatında dinleyebilme.
-
-### 🛠️ Akıllı Teknolojiler
-
-* **Material You Tasarımı:** Dinamik renk geçişleri, yuvarlak hatlar ve göz yormayan arayüz.
-* **Kusursuz Karanlık Mod:** Sistem tercihiyle uyumlu veya manuel geçişli gece modu.
-* **Akıllı Hafıza & Performans:** * `localStorage` ile kalınan yeri hatırlama.
-* `History API` ile tarayıcı düğmeleriyle tam uyum.
-* `API Caching` ile ışık hızında sayfa geçişleri.
-
-
-
----
-
-## 🚀 Kurulum ve Çalıştırma
-
-Bu proje **"Tek Dosya Mimarisi"** ile geliştirilmiştir. Karmaşık Node.js süreçlerine veya `npm install` komutlarına ihtiyaç duymaz.
-
-1. Projeyi indirin veya klonlayın.
-2. Aşağıdaki font dosyalarının `index.html` ile aynı dizinde olduğundan emin olun:
-* `KuranKerimFontAbay.ttf`
-* `KuranKerimFontLatif.ttf`
-* `KuranKerimFontHamdullah.ttf`
-
-
-3. `index.html` dosyasını modern bir tarayıcıda (Chrome, Edge, Safari vb.) açın.
-
-> [!TIP]
-> Proje statik yapıda olduğu için **GitHub Pages**, **Vercel** veya **Netlify** üzerinde saniyeler içinde yayına alınabilir.
-
----
-
-## 🛠️ Kullanılan Teknolojiler
-
-| Bileşen | Teknoloji | Kullanım Amacı |
-| --- | --- | --- |
-| **Mantık & UI** | React.js (via CDN) | State yönetimi ve dinamik arayüz. |
-| **Stil** | Tailwind CSS (via CDN) | Modern, responsive ve hızlı tasarım. |
-| **Derleme** | Babel (Standalone) | Tarayıcı içi JS modernizasyonu. |
-| **Veri Kaynağı** | [Açık Kuran API](https://www.google.com/search?q=https://api.acikkuran.com) | Ayet, meal, sözlük ve gramer verileri. |
-
----
-
-## 📁 Dosya Yapısı
+## 📁 Proje Yapısı
 
 ```text
 /
-├── index.html                   # Ana uygulama (UI, Logic ve CSS tek dosyada)
-├── KuranKerimFontAbay.ttf       # Özel Arapça Font (Abay)
-├── KuranKerimFontLatif.ttf      # Özel Arapça Font (Latif)
-├── KuranKerimFontHamdullah.ttf  # Özel Arapça Font (Hamdullah)
-└── README.md                    # Proje dökümantasyonu
-
+├── index.html
+├── src/
+│   ├── main.jsx
+│   └── styles.css
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+└── README.md
 ```
 
----
+## 🚀 Geliştirme
 
-## 🤝 Veri Kaynağı ve Lisans
+> Bu sürüm, önceki tek dosya/CDN mimarisinden **Vite + modüler kaynak** yapısına taşınmıştır.
 
-* **Veri:** Tüm içerik **Açık Kuran API** üzerinden sağlanmaktadır. Varsayılan meal *Hasan Basri Çantay*'a aittir; ancak ayarlar menüsünden onlarca farklı mütercim seçilebilir.
-* **Lisans:** Bu proje, topluma fayda sağlama ve kişisel gelişim amacıyla **Açık Kaynak** olarak sunulmuştur.
+1. Node.js 18+ kur
+2. Bağımlılıkları yükle:
+   - `npm install`
+3. Geliştirme sunucusunu başlat:
+   - `npm run dev`
+4. Production build al:
+   - `npm run build`
+5. Build önizleme:
+   - `npm run preview`
+
+### NPM Scriptleri
+
+| Komut | Açıklama |
+|---|---|
+| `npm run dev` | Geliştirme sunucusunu başlatır |
+| `npm run lint` | ESLint ile kod kalitesi kontrolü yapar |
+| `npm run lint:fix` | Düzeltilebilir lint sorunlarını otomatik düzeltir |
+| `npm run typecheck` | TypeScript tabanlı no-emit tip/konfigürasyon kontrolü yapar |
+| `npm run check` | Lint + typecheck + build zincirini birlikte çalıştırır |
+| `npm run clean` | `dist` klasörünü temizler |
+| `npm run build:only` | Sadece Vite production build alır |
+| `npm run build` | Önce temizler, sonra production build alır |
+| `npm run preview` | Build çıktısını yerelde önizler |
+
+Not: Bu komutlar için Node.js 18+ önerilir.
+
+Örnek geliştirme akışı: `npm install` → `npm run dev`
+
+Örnek yayın öncesi kontrol: `npm run build` → `npm run preview`
+
+## 🔤 Font Dosyaları
+
+Aşağıdaki dosyalar `public/fonts/` klasöründe bulunmalıdır:
+
+- `public/fonts/KuranKerimFontAbay.ttf`
+- `public/fonts/KuranKerimFontLatif.ttf`
+- `public/fonts/KuranKerimFontHamdullah.ttf`
+
+## 🌐 Veri Kaynağı
+
+Tüm içerik Açık Kuran API üzerinden sağlanır: `https://api.acikkuran.com`

@@ -1,0 +1,70 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+/* ÖZEL FONTLAR YÜKLENİYOR */
+        @font-face {
+            font-family: 'Abay';
+            src: local('Abay'), url('/fonts/KuranKerimFontAbay.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Latif';
+            src: local('Latif'), url('/fonts/KuranKerimFontLatif.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Hamdullah';
+            src: local('Hamdullah'), url('/fonts/KuranKerimFontHamdullah.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Font Sınıfları */
+        .font-arabic-abay { font-family: 'Abay', 'Amiri', serif; }
+        .font-arabic-latif { font-family: 'Latif', 'Amiri', serif; }
+        .font-arabic-hamdullah { font-family: 'Hamdullah', 'Amiri', serif; }
+        .font-arabic-amiri { font-family: 'Amiri', serif; } 
+
+        .font-sans { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        /* Modern Scrollbar - Material You Gizli Scroll */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+
+        /* Mushaf Modu için Gelişmiş Ayarlar */
+        .mushaf-page {
+            background-color: #fdfcf8;
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.02);
+            border: 1px solid #e2e8f0;
+        }
+        .dark .mushaf-page {
+            background-color: #0b0f19;
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.4);
+            border: 1px solid #1e293b;
+        }
+        .mushaf-layout {
+            text-align: justify;
+            text-justify: inter-word;
+            text-align-last: center; 
+            line-height: 2.6 !important; 
+            direction: rtl;
+        }
+        .ayah-marker {
+            display: inline-block;
+            white-space: nowrap; 
+            margin: 0 0.3rem;
+            user-select: none;
+        }
+
+        /* Animasyonlar */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.2, 0, 0, 1) forwards; }
+        .slide-up { animation: slideUp 0.5s cubic-bezier(0.2, 0, 0, 1) forwards; }
+
